@@ -71,17 +71,119 @@ router.get('/search/:query', async (req, res) => {
 // Create a new service request
 router.post('/request', async (req, res) => {
     try {
-        const { customer_id, service_type, description, latitude, longitude, address } = req.body;
+        const { 
+            customer_id, 
+            service_type, 
+            description, 
+            latitude, 
+            longitude, 
+            address,
+            landmark,
+            city,
+            pincode,
+            scheduled_date,
+            time_slot,
+            payment_method,
+            amount
+        } = req.body;
         
-        const newRequest = await pool.query(
-            'INSERT INTO service_requests (customer_id, service_type, description, location, address) VALUES ($1, $2, $3, point($4, $5), $6) RETURNING *',
-            [customer_id, service_type, description, longitude, latitude, address]
-        );
+        console.log('Received request body:', req.body);
         
-        res.json(newRequest.rows[0]);
+        // Validate required fields
+        if (!customer_id || !service_type || !address || !city || !pincode || !scheduled_date || !time_slot || !payment_method || !amount) {
+            console.log('Missing fields validation failed:', {
+                customer_id: !!customer_id,
+                service_type: !!service_type,
+                address: !!address,
+                city: !!city,
+                pincode: !!pincode,
+                scheduled_date: !!scheduled_date,
+                time_slot: !!time_slot,
+                payment_method: !!payment_method,
+                amount: !!amount
+            });
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(scheduled_date)) {
+            console.log('Invalid date format:', scheduled_date);
+            return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD' });
+        }
+
+        // Validate pincode format
+        const pincodeRegex = /^\d{6}$/;
+        if (!pincodeRegex.test(pincode)) {
+            console.log('Invalid pincode format:', pincode);
+            return res.status(400).json({ message: 'Invalid pincode format' });
+        }
+
+        // Handle location point
+        let locationQuery = 'NULL';
+        let locationParams = [];
+        
+        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+            locationQuery = 'point($4, $5)';
+            locationParams = [longitude, latitude];
+        }
+
+        const queryParams = [
+            customer_id, 
+            service_type, 
+            description || '', 
+            ...locationParams,
+            address,
+            landmark || '',
+            city,
+            pincode,
+            scheduled_date,
+            time_slot,
+            payment_method,
+            parseFloat(amount)
+        ];
+
+        const placeholders = Array.from({ length: queryParams.length }, (_, i) => `$${i + 1}`);
+        
+        const query = `
+            INSERT INTO service_requests (
+                customer_id, 
+                service_type, 
+                description, 
+                location, 
+                address,
+                landmark,
+                city,
+                pincode,
+                scheduled_date,
+                time_slot,
+                payment_method,
+                amount
+            ) VALUES (
+                $1, $2, $3, 
+                ${locationQuery}, 
+                ${placeholders.slice(locationParams.length + 3).join(', ')}
+            ) 
+            RETURNING *`;
+            
+        console.log('Executing query:', query);
+        console.log('With parameters:', queryParams);
+
+        const newRequest = await pool.query(query, queryParams);
+        
+        console.log('Request created successfully:', newRequest.rows[0]);
+        res.status(201).json(newRequest.rows[0]);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Detailed error in service request:', {
+            error: err,
+            message: err.message,
+            stack: err.stack,
+            code: err.code,
+            detail: err.detail,
+            hint: err.hint,
+            position: err.position
+        });
+        res.status(500).json({ message: err.message || 'Server error' });
     }
 });
 
@@ -154,6 +256,42 @@ router.post('/reviews', async (req, res) => {
         res.json(newReview.rows[0]);
     } catch (err) {
         console.error(err.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get service request details with location for servicemen
+router.get('/request/:requestId/location', async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        
+        const request = await pool.query(
+            `SELECT 
+                sr.request_id,
+                sr.service_type,
+                sr.description,
+                sr.address,
+                sr.city,
+                sr.pincode,
+                sr.scheduled_date,
+                sr.time_slot,
+                ST_X(sr.location::geometry) as longitude,
+                ST_Y(sr.location::geometry) as latitude,
+                u.full_name as customer_name,
+                u.phone as customer_phone
+            FROM service_requests sr
+            JOIN users u ON sr.customer_id = u.id
+            WHERE sr.request_id = $1 AND sr.assigned_worker = $2`,
+            [requestId, req.query.workerId]
+        );
+
+        if (request.rows.length === 0) {
+            return res.status(404).json({ message: 'Service request not found or not assigned to this worker' });
+        }
+
+        res.json(request.rows[0]);
+    } catch (err) {
+        console.error('Error fetching service request location:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });

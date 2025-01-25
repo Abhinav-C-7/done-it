@@ -24,6 +24,7 @@ import PestControlServiceDetails from './pages/PestControlServiceDetails';
 import FanInstallationServiceDetails from './pages/FanInstallationServiceDetails';
 import CarpentryServiceDetails from './pages/CarpentryServiceDetails';
 import Checkout from './pages/Checkout';
+import OrderConfirmation from './pages/OrderConfirmation';
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
               <Route path="/services/carpentry" element={<CarpentryServiceDetails />} />
               <Route path="/service-request" element={<ServiceRequest />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/order-confirmation" element={<OrderConfirmation />} />
               <Route
                 path="/profile"
                 element={

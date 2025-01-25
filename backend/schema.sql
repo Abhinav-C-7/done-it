@@ -59,11 +59,79 @@ CREATE TABLE IF NOT EXISTS service_requests (
     service_type TEXT NOT NULL,
     description TEXT,
     location POINT,
+    address TEXT NOT NULL,
+    payment_method TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
     status TEXT DEFAULT 'pending',
     assigned_worker INTEGER REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add landmark column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'service_requests' 
+        AND column_name = 'landmark'
+    ) THEN
+        ALTER TABLE service_requests ADD COLUMN landmark TEXT;
+    END IF;
+END $$;
+
+-- Add city column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'service_requests' 
+        AND column_name = 'city'
+    ) THEN
+        ALTER TABLE service_requests ADD COLUMN city TEXT;
+    END IF;
+END $$;
+
+-- Add pincode column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'service_requests' 
+        AND column_name = 'pincode'
+    ) THEN
+        ALTER TABLE service_requests ADD COLUMN pincode TEXT;
+    END IF;
+END $$;
+
+-- Add scheduled_date column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'service_requests' 
+        AND column_name = 'scheduled_date'
+    ) THEN
+        ALTER TABLE service_requests ADD COLUMN scheduled_date DATE;
+    END IF;
+END $$;
+
+-- Add time_slot column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'service_requests' 
+        AND column_name = 'time_slot'
+    ) THEN
+        ALTER TABLE service_requests ADD COLUMN time_slot TEXT;
+    END IF;
+END $$;
 
 -- Add indexes
 CREATE INDEX IF NOT EXISTS idx_worker_profiles_worker_id ON worker_profiles(worker_id);
