@@ -184,15 +184,26 @@ const Checkout = () => {
         <div className="min-h-screen bg-gray-50">
             <Navbar />
             <div className="max-w-6xl mx-auto pt-20 px-4">
-                <h1 className="text-2xl font-bold mb-8">Checkout</h1>
+                <div className="flex items-center mb-8 space-x-3">
+                    <h1 className="text-3xl font-bold text-gray-800">Checkout</h1>
+                    <div className="h-1 w-20 bg-yellow-400 rounded-full"></div>
+                </div>
                 
                 <div className="flex flex-col md:flex-row gap-8">
                     {/* Left Section - Form */}
                     <div className="flex-1">
                         <form onSubmit={handleSubmit} className="space-y-6">
                             {/* Address Section */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm">
-                                <h2 className="text-lg font-semibold mb-4">Service Address</h2>
+                            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+                                <div className="flex items-center mb-6">
+                                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Service Address</h2>
+                                </div>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -202,18 +213,28 @@ const Checkout = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowModal(true)}
-                                                className="w-full px-4 py-2 bg-yellow-400 text-white rounded-lg hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+                                                className="w-full px-4 py-2 bg-yellow-400 text-white rounded-lg hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 shadow-sm hover:shadow-md transition-all duration-200"
                                             >
-                                                Select an Address
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    <span>Select an Address</span>
+                                                </div>
                                             </button>
                                             {address && (
-                                                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                                    {address}
+                                                <div className="mt-2 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                                                    <div className="flex items-start">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-600 mt-0.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        </svg>
+                                                        <p className="text-gray-700">{address}</p>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-                                    <div>
+                                    <div className="relative">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Landmark
                                         </label>
@@ -222,11 +243,14 @@ const Checkout = () => {
                                             name="landmark"
                                             value={formData.landmark}
                                             onChange={handleInputChange}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
+                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
                                         />
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
+                                        <div className="relative">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                                 City
                                             </label>
@@ -236,10 +260,13 @@ const Checkout = () => {
                                                 value={formData.city}
                                                 onChange={handleInputChange}
                                                 required
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
+                                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
                                             />
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                            </svg>
                                         </div>
-                                        <div>
+                                        <div className="relative">
                                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                                 PIN Code
                                             </label>
@@ -250,18 +277,28 @@ const Checkout = () => {
                                                 onChange={handleInputChange}
                                                 required
                                                 pattern="[0-9]{6}"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
+                                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
                                             />
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                            </svg>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Time Slot Section */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm">
-                                <h2 className="text-lg font-semibold mb-4">Select Date & Time</h2>
+                            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+                                <div className="flex items-center mb-6">
+                                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Select Date & Time</h2>
+                                </div>
                                 <div className="space-y-4">
-                                    <div>
+                                    <div className="relative">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Preferred Date
                                         </label>
@@ -272,10 +309,13 @@ const Checkout = () => {
                                             onChange={handleInputChange}
                                             min={minDate}
                                             required
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
+                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
                                         />
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
                                     </div>
-                                    <div>
+                                    <div className="relative">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Preferred Time Slot
                                         </label>
@@ -284,7 +324,7 @@ const Checkout = () => {
                                             value={formData.timeSlot}
                                             onChange={handleInputChange}
                                             required
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
+                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400 appearance-none"
                                         >
                                             <option value="">Select a time slot</option>
                                             {timeSlots.map(slot => (
@@ -293,15 +333,25 @@ const Checkout = () => {
                                                 </option>
                                             ))}
                                         </select>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Payment Method Section */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm">
-                                <h2 className="text-lg font-semibold mb-4">Payment Method</h2>
+                            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+                                <div className="flex items-center mb-6">
+                                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Payment Method</h2>
+                                </div>
                                 <div className="space-y-3">
-                                    <label className="flex items-center space-x-3">
+                                    <label className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-yellow-400 cursor-pointer transition-colors">
                                         <input
                                             type="radio"
                                             name="paymentMethod"
@@ -310,9 +360,12 @@ const Checkout = () => {
                                             onChange={handleInputChange}
                                             className="h-4 w-4 text-yellow-400 focus:ring-yellow-400"
                                         />
-                                        <span>Cash on Service</span>
+                                        <div className="ml-3">
+                                            <span className="font-medium text-gray-700">Cash on Service</span>
+                                            <p className="text-sm text-gray-500">Pay after the service is completed</p>
+                                        </div>
                                     </label>
-                                    <label className="flex items-center space-x-3">
+                                    <label className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-yellow-400 cursor-pointer transition-colors">
                                         <input
                                             type="radio"
                                             name="paymentMethod"
@@ -321,44 +374,57 @@ const Checkout = () => {
                                             onChange={handleInputChange}
                                             className="h-4 w-4 text-yellow-400 focus:ring-yellow-400"
                                         />
-                                        <span>UPI</span>
+                                        <div className="ml-3">
+                                            <span className="font-medium text-gray-700">UPI</span>
+                                            <p className="text-sm text-gray-500">Pay securely via UPI</p>
+                                        </div>
                                     </label>
                                 </div>
                             </div>
 
                             <button
                                 type="submit"
-                                className="w-full bg-yellow-400 text-black py-3 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors"
+                                className="w-full bg-yellow-400 text-black py-4 px-6 rounded-lg font-medium hover:bg-yellow-500 transition-colors shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
                             >
-                                Place Order
+                                <span>Place Order</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
                             </button>
                         </form>
                     </div>
 
                     {/* Right Section - Order Summary */}
                     <div className="md:w-80">
-                        <div className="bg-white p-6 rounded-lg shadow-sm sticky top-24">
-                            <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+                        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 sticky top-24 hover:shadow-lg transition-shadow duration-300">
+                            <div className="flex items-center mb-6">
+                                <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                </div>
+                                <h2 className="text-lg font-semibold text-gray-800">Order Summary</h2>
+                            </div>
                             <div className="space-y-4">
                                 {cartItems.map((item, index) => (
-                                    <div key={index} className="flex justify-between items-start py-3 border-b">
+                                    <div key={index} className="flex justify-between items-start py-3 border-b border-gray-100">
                                         <div>
-                                            <h3 className="font-medium">{item.type}</h3>
+                                            <h3 className="font-medium text-gray-800">{item.type}</h3>
                                             <p className="text-sm text-gray-500">{item.time}</p>
                                         </div>
-                                        <span className="font-medium">{item.price}</span>
+                                        <span className="font-medium text-gray-800">₹{item.price}</span>
                                     </div>
                                 ))}
                                 <div className="pt-2">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-gray-600">Subtotal</span>
-                                        <span className="font-medium">₹{total}</span>
+                                        <span className="font-medium text-gray-800">₹{total}</span>
                                     </div>
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-gray-600">Service Fee</span>
-                                        <span className="font-medium">₹49</span>
+                                        <span className="font-medium text-gray-800">₹49</span>
                                     </div>
-                                    <div className="flex justify-between items-center pt-2 border-t font-medium">
+                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 font-medium">
                                         <span>Total</span>
                                         <span>₹{total + 49}</span>
                                     </div>
