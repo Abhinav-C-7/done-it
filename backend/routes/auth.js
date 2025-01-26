@@ -8,6 +8,27 @@ router.post('/register', async (req, res) => {
     try {
         const { email, password, full_name, phone_number, user_type } = req.body;
         
+        console.log('Registration attempt with data:', { email, full_name, phone_number, user_type });
+        
+        // Validation
+        if (!email || !password || !full_name || !phone_number) {
+            console.log('Missing required fields:', { 
+                hasEmail: !!email, 
+                hasPassword: !!password, 
+                hasFullName: !!full_name, 
+                hasPhone: !!phone_number 
+            });
+            return res.status(400).json({ 
+                message: 'All fields are required',
+                missing: {
+                    email: !email,
+                    password: !password,
+                    full_name: !full_name,
+                    phone_number: !phone_number
+                }
+            });
+        }
+        
         // Check if user exists
         const userExists = await pool.query(
             'SELECT * FROM users WHERE email = $1',

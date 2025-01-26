@@ -50,23 +50,28 @@ export function AuthProvider({ children }) {
                 email,
                 password
             });
-            
+
             const { token, user: userData } = response.data;
-            
-            if (token && userData) {
-                localStorage.setItem('token', token);
-                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-                setUser({
-                    ...userData,
-                    token
-                });
-                return { success: true, user: userData };
-            } else {
-                throw new Error('Invalid response from server');
-            }
+            localStorage.setItem('token', token);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            setUser({ ...userData, token });
+            return response.data;
         } catch (error) {
-            console.error('Login error:', error);
-            throw error.response?.data || { message: 'Failed to login' };
+            throw error.response?.data || error;
+        }
+    };
+
+    const register = async (formData) => {
+        try {
+            console.log('Sending registration data:', formData);
+            const response = await axios.post('http://localhost:5000/api/auth/register', formData);
+            return response.data;
+        } catch (error) {
+            console.error('Registration error details:', error.response?.data);
+            if (error.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Failed to register. Please try again.');
         }
     };
 
@@ -80,6 +85,7 @@ export function AuthProvider({ children }) {
         user,
         login,
         logout,
+        register,
         loading
     };
 
