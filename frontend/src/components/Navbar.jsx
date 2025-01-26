@@ -1,21 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
-import { useLocation } from '../context/LocationContext';
 import profileIcon from '../assets/images/profile.png';
 import postIcon from '../assets/images/post.png';
 import homeIcon from '../assets/images/home.png';
-import LocationSearch from './LocationSearch';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
-    const { updateLocation } = useLocation();
-    const [location, setLocation] = useState("");
-
-    const handleLocationSelect = (selectedLocation) => {
-        updateLocation(selectedLocation);
-        setLocation(selectedLocation);
-    };
 
     return (
         <nav className="bg-white shadow-lg fixed top-0 left-0 right-0 z-50">
@@ -26,11 +17,6 @@ const Navbar = () => {
                         <Link to="/" className="flex items-center">
                             <span className="text-xl font-bold text-yellow-500">Done-It</span>
                         </Link>
-                    </div>
-
-                    {/* Center - Location Search */}
-                    <div className="flex-1 flex justify-center">
-                        <LocationSearch onLocationSelect={handleLocationSelect} />
                     </div>
 
                     {/* Right - Navigation Icons */}
@@ -54,7 +40,7 @@ const Navbar = () => {
                                 </button>
                             </>
                         ) : (
-                            <div className="space-x-4">
+                            <>
                                 <Link
                                     to="/login"
                                     className="text-gray-600 hover:text-gray-900"
@@ -63,11 +49,11 @@ const Navbar = () => {
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                                    className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600"
                                 >
                                     Register
                                 </Link>
-                            </div>
+                            </>
                         )}
                     </div>
                 </div>

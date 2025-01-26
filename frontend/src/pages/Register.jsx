@@ -8,7 +8,7 @@ function Register() {
         email: '',
         password: '',
         phone_number: '',
-        user_type: 'customer' // Default to customer
+        user_type: 'customer'
     });
     const [error, setError] = useState('');
     const { register } = useAuth();
@@ -23,6 +23,28 @@ function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
+        
+        // Basic validation
+        if (!formData.full_name || !formData.email || !formData.password || !formData.phone_number) {
+            setError('All fields are required');
+            return;
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            setError('Please enter a valid email address');
+            return;
+        }
+
+        // Phone number validation
+        const phoneRegex = /^[0-9]{10}$/;
+        if (!phoneRegex.test(formData.phone_number)) {
+            setError('Please enter a valid 10-digit phone number');
+            return;
+        }
+
         try {
             await register(formData);
             navigate('/login');
@@ -50,7 +72,7 @@ function Register() {
                                     </svg>
                                 </div>
                                 <div className="ml-3">
-                                    <p className="text-sm text-red-700">{error}</p>
+                                    <p className="text-sm text-red-600">{error}</p>
                                 </div>
                             </div>
                         </div>
@@ -114,27 +136,28 @@ function Register() {
                                 value={formData.phone_number}
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500"
+                                placeholder="10-digit number"
                             />
                         </div>
 
                         <div>
                             <button
                                 type="submit"
-                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                             >
                                 Create Account
                             </button>
                         </div>
                     </form>
-                </div>
 
-                <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
-                    <p className="text-sm text-center text-gray-600">
-                        Already have an account?{' '}
-                        <Link to="/login" className="font-medium text-yellow-600 hover:text-yellow-500">
-                            Sign in instead
-                        </Link>
-                    </p>
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-gray-600">
+                            Already have an account?{' '}
+                            <Link to="/login" className="font-medium text-yellow-600 hover:text-yellow-500">
+                                Login here
+                            </Link>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
