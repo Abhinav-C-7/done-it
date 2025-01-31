@@ -1,5 +1,11 @@
--- Create users table if not exists
-CREATE TABLE IF NOT EXISTS users (
+-- Drop tables in correct order
+DROP TABLE IF EXISTS service_requests CASCADE;
+DROP TABLE IF EXISTS worker_profiles CASCADE;
+DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS services CASCADE;
+
+-- Create customers table if not exists
+CREATE TABLE IF NOT EXISTS customers (
     id SERIAL PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
@@ -12,10 +18,13 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create worker_profiles table
 CREATE TABLE IF NOT EXISTS worker_profiles (
     id SERIAL PRIMARY KEY,
-    worker_id INTEGER NOT NULL REFERENCES users(id),
-    skills TEXT[],
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    mobile_number TEXT DEFAULT NULL,
+    skills TEXT[] DEFAULT NULL,
     availability BOOLEAN DEFAULT true,
-    current_location POINT,
+    current_location POINT DEFAULT NULL,
     rating DECIMAL(3,2) DEFAULT 0.0,
     total_jobs INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -34,6 +43,34 @@ CREATE TABLE IF NOT EXISTS services (
     is_active BOOLEAN DEFAULT true
 );
 
+-- Create service_requests table
+CREATE TABLE IF NOT EXISTS service_requests (
+    request_id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id),
+    service_type TEXT NOT NULL,
+    description TEXT,
+    location POINT,
+    address TEXT NOT NULL,
+    payment_method TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status TEXT DEFAULT 'pending',
+    assigned_worker INTEGER REFERENCES worker_profiles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    landmark TEXT,
+    city TEXT,
+    pincode TEXT,
+    scheduled_date DATE,
+    time_slot TEXT
+);
+
+-- Add indexes
+CREATE INDEX IF NOT EXISTS idx_worker_profiles_id ON worker_profiles(id);
+CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(status);
+CREATE INDEX IF NOT EXISTS idx_service_requests_assigned_worker ON service_requests(assigned_worker);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+CREATE INDEX IF NOT EXISTS idx_services_is_active ON services(is_active);
+
 -- Insert initial services if none exist
 INSERT INTO services (title, description, category, base_price, image_url)
 SELECT * FROM (VALUES
@@ -51,91 +88,3 @@ SELECT * FROM (VALUES
     ('Computer Repair', 'Expert computer and laptop repair services', 'Electronics', 800.00, '/images/services/computer-repair.png')
 ) AS tmp
 WHERE NOT EXISTS (SELECT 1 FROM services LIMIT 1);
-
--- Create service_requests table if not exists
-CREATE TABLE IF NOT EXISTS service_requests (
-    request_id SERIAL PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES users(id),
-    service_type TEXT NOT NULL,
-    description TEXT,
-    location POINT,
-    address TEXT NOT NULL,
-    payment_method TEXT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    status TEXT DEFAULT 'pending',
-    assigned_worker INTEGER REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Add landmark column if it doesn't exist
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'service_requests' 
-        AND column_name = 'landmark'
-    ) THEN
-        ALTER TABLE service_requests ADD COLUMN landmark TEXT;
-    END IF;
-END $$;
-
--- Add city column if it doesn't exist
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'service_requests' 
-        AND column_name = 'city'
-    ) THEN
-        ALTER TABLE service_requests ADD COLUMN city TEXT;
-    END IF;
-END $$;
-
--- Add pincode column if it doesn't exist
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'service_requests' 
-        AND column_name = 'pincode'
-    ) THEN
-        ALTER TABLE service_requests ADD COLUMN pincode TEXT;
-    END IF;
-END $$;
-
--- Add scheduled_date column if it doesn't exist
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'service_requests' 
-        AND column_name = 'scheduled_date'
-    ) THEN
-        ALTER TABLE service_requests ADD COLUMN scheduled_date DATE;
-    END IF;
-END $$;
-
--- Add time_slot column if it doesn't exist
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'service_requests' 
-        AND column_name = 'time_slot'
-    ) THEN
-        ALTER TABLE service_requests ADD COLUMN time_slot TEXT;
-    END IF;
-END $$;
-
--- Add indexes
-CREATE INDEX IF NOT EXISTS idx_worker_profiles_worker_id ON worker_profiles(worker_id);
-CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(status);
-CREATE INDEX IF NOT EXISTS idx_service_requests_assigned_worker ON service_requests(assigned_worker);
-CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
-CREATE INDEX IF NOT EXISTS idx_services_is_active ON services(is_active);

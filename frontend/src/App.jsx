@@ -25,6 +25,8 @@ import FanInstallationServiceDetails from './pages/FanInstallationServiceDetails
 import CarpentryServiceDetails from './pages/CarpentryServiceDetails';
 import Checkout from './pages/Checkout';
 import OrderConfirmation from './pages/OrderConfirmation';
+import ServicemanRegister from './pages/ServicemanRegister';
+import WorkerWelcome from './pages/WorkerWelcome';
 
 function App() {
   return (
@@ -37,6 +39,8 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/serviceman-register" element={<ServicemanRegister />} />
+              <Route path="/worker/welcome" element={<WorkerWelcome />} />
               <Route path="/services" element={<Services />} />
               <Route path="/services/ac" element={<ACServiceDetails />} />
               <Route path="/services/plumbing" element={<PlumbingServiceDetails />} />

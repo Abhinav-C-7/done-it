@@ -15,13 +15,18 @@ function Login() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
         try {
             const response = await login(email, password);
-            if (response.user) {
+            if (response.serviceman) {
+                // Serviceman login successful
+                navigate('/worker/welcome');
+            } else if (response.user) {
+                // Customer login successful
                 navigate('/', { replace: true });
             }
         } catch (err) {
-            setError(err.message);
+            setError(err.message || 'Login failed');
         }
     };
 
@@ -88,10 +93,18 @@ function Login() {
                                     <div className="text-center">
                                         <Link
                                             to="/register"
-                                            className="text-sm text-gray-600 hover:text-yellow-600 transition-colors duration-200"
+                                            className="text-yellow-600 hover:text-yellow-700 font-medium"
                                         >
-                                            Don't have an account? <span className="font-semibold">Register now</span>
+                                            Don't have an account? Register here
                                         </Link>
+                                        <div className="mt-2">
+                                            <Link
+                                                to="/serviceman-register"
+                                                className="text-blue-600 hover:text-blue-700 font-medium"
+                                            >
+                                                Register as a Serviceman
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
                             </form>

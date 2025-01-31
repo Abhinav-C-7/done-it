@@ -74,41 +74,73 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        const isServiceman = email.endsWith('@serviceman.doneit.com');
 
-        // Check if user exists
-        const user = await pool.query(
-            'SELECT * FROM users WHERE email = $1',
-            [email]
-        );
+        let user;
+        if (isServiceman) {
+            // Check worker_profiles table
+            const result = await pool.query(
+                'SELECT * FROM worker_profiles WHERE email = $1',
+                [email]
+            );
+            if (result.rows.length > 0) {
+                user = result.rows[0];
+            }
+        } else {
+            // Check users table
+            const result = await pool.query(
+                'SELECT * FROM users WHERE email = $1',
+                [email]
+            );
+            if (result.rows.length > 0) {
+                user = result.rows[0];
+            }
+        }
 
-        if (user.rows.length === 0) {
+        if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         // Check password
-        const validPassword = await bcrypt.compare(password, user.rows[0].password);
+        const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Create token
+        // Create token with user type
         const token = jwt.sign(
-            { id: user.rows[0].user_id, user_type: user.rows[0].user_type },
+            { 
+                id: isServiceman ? user.id : user.user_id,
+                type: isServiceman ? 'serviceman' : 'customer'
+            },
             process.env.JWT_SECRET || 'your_jwt_secret'
         );
 
-        // Send user data without password
-        const userData = {
-            user_id: user.rows[0].user_id,
-            email: user.rows[0].email,
-            full_name: user.rows[0].full_name,
-            phone_number: user.rows[0].phone_number,
-            user_type: user.rows[0].user_type
-        };
-
-        res.json({ token, user: userData });
+        // Send response based on user type
+        if (isServiceman) {
+            res.json({
+                token,
+                serviceman: {
+                    id: user.id,
+                    email: user.email,
+                    fullName: user.full_name,
+                    type: 'serviceman'
+                }
+            });
+        } else {
+            res.json({
+                token,
+                user: {
+                    id: user.user_id,
+                    email: user.email,
+                    fullName: user.full_name,
+                    phone: user.phone_number,
+                    type: 'customer'
+                }
+            });
+        }
     } catch (err) {
-        console.error(err.message);
+        console.error('Login error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -139,6 +171,108 @@ router.get('/verify', async (req, res) => {
         if (err.name === 'JsonWebTokenError') {
             return res.status(401).json({ message: 'Invalid token' });
         }
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Serviceman Register
+router.post('/serviceman/register', async (req, res) => {
+    try {
+        const { fullName, email, password } = req.body;
+        
+        // Validation
+        if (!email || !password || !fullName) {
+            return res.status(400).json({ 
+                message: 'All fields are required'
+            });
+        }
+        
+        // Validate email format
+        const emailRegex = /@serviceman\.doneit\.com$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ 
+                message: 'Invalid email format. Must be name@serviceman.doneit.com'
+            });
+        }
+        
+        // Check if serviceman exists
+        const servicemanExists = await pool.query(
+            'SELECT * FROM worker_profiles WHERE email = $1',
+            [email]
+        );
+        
+        if (servicemanExists.rows.length > 0) {
+            return res.status(400).json({ message: 'Email already registered' });
+        }
+        
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        
+        // Create serviceman profile with default values for optional fields
+        const newServiceman = await pool.query(
+            `INSERT INTO worker_profiles 
+            (email, password, full_name, mobile_number, skills, availability, current_location, rating, total_jobs) 
+            VALUES ($1, $2, $3, NULL, NULL, true, NULL, 0.0, 0) 
+            RETURNING id, email, full_name`,
+            [email, hashedPassword, fullName]
+        );
+        
+        res.json({ 
+            success: true,
+            message: 'Registration successful',
+            serviceman: {
+                id: newServiceman.rows[0].id,
+                email: newServiceman.rows[0].email,
+                fullName: newServiceman.rows[0].full_name
+            }
+        });
+    } catch (err) {
+        console.error('Serviceman registration error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Serviceman Login
+router.post('/serviceman/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Check if serviceman exists
+        const serviceman = await pool.query(
+            'SELECT * FROM worker_profiles WHERE email = $1',
+            [email]
+        );
+
+        if (serviceman.rows.length === 0) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        // Check password
+        const validPassword = await bcrypt.compare(password, serviceman.rows[0].password);
+        if (!validPassword) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        // Create token
+        const token = jwt.sign(
+            { 
+                id: serviceman.rows[0].id,
+                type: 'serviceman'
+            },
+            process.env.JWT_SECRET || 'your_jwt_secret'
+        );
+
+        res.json({
+            token,
+            serviceman: {
+                id: serviceman.rows[0].id,
+                email: serviceman.rows[0].email,
+                fullName: serviceman.rows[0].full_name
+            }
+        });
+    } catch (err) {
+        console.error('Serviceman login error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });

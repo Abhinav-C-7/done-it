@@ -46,15 +46,20 @@ export function AuthProvider({ children }) {
 
     const login = async (email, password) => {
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/login', {
+            // Check if it's a serviceman login
+            const isServiceman = email.endsWith('@serviceman.doneit.com');
+            const endpoint = isServiceman ? '/api/auth/serviceman/login' : '/api/auth/login';
+            
+            const response = await axios.post(`http://localhost:5000${endpoint}`, {
                 email,
                 password
             });
 
-            const { token, user: userData } = response.data;
+            const { token, user: userData, serviceman } = response.data;
             localStorage.setItem('token', token);
+            localStorage.setItem('userType', isServiceman ? 'serviceman' : 'customer');
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            setUser({ ...userData, token });
+            setUser({ ...(isServiceman ? serviceman : userData), token, type: isServiceman ? 'serviceman' : 'customer' });
             return response.data;
         } catch (error) {
             throw error.response?.data || error;
@@ -75,8 +80,21 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const registerServiceman = async (formData) => {
+        try {
+            const response = await axios.post('http://localhost:5000/api/auth/serviceman/register', formData);
+            return response.data;
+        } catch (error) {
+            if (error.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Failed to register. Please try again.');
+        }
+    };
+
     const logout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('userType');
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);
     };
@@ -86,6 +104,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         register,
+        registerServiceman,
         loading
     };
 
