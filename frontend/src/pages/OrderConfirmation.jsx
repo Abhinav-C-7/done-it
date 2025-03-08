@@ -104,7 +104,16 @@ const OrderConfirmation = () => {
                     {/* Action Buttons */}
                     <div className="mt-8 flex justify-center space-x-4">
                         <button
-                            onClick={() => navigate('/orders')}
+                            onClick={() => {
+                                // Ensure we have the latest token before navigating
+                                const token = localStorage.getItem('token');
+                                if (!token) {
+                                    alert('Please login to view your orders');
+                                    navigate('/login');
+                                } else {
+                                    navigate('/orders');
+                                }
+                            }}
                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
                         >
                             View My Orders

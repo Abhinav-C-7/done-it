@@ -16,6 +16,7 @@ const path = require('path');
 const authRoute = require('./routes/auth');
 const servicesRoute = require('./routes/services');
 const workerRoutes = require('./routes/workers');
+const ordersRoutes = require('./routes/orders');
 
 // Middleware
 app.use(cors({
@@ -32,6 +33,7 @@ app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 app.use('/api/auth', authRoute);
 app.use('/api/services', servicesRoute);
 app.use('/api/workers', workerRoutes);
+app.use('/api/orders', ordersRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
