@@ -1,14 +1,32 @@
 const router = require('express').Router();
 const pool = require('../config/db');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
-// Get all active services
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    try {
+        const verified = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = verified;
+        next();
+    } catch (err) {
+        res.status(401).json({ message: 'Invalid token' });
+    }
+};
+
+// Get all services
 router.get('/', async (req, res) => {
     try {
-        console.log('Fetching all services...');
         const services = await pool.query(
-            'SELECT * FROM services WHERE is_active = true ORDER BY category, title'
+            'SELECT service_id, title, description, category, base_price, image_url FROM services WHERE is_active = true ORDER BY title'
         );
-        console.log(`Found ${services.rows.length} services`);
         res.json(services.rows);
     } catch (err) {
         console.error('Error fetching services:', err);
@@ -71,12 +89,14 @@ router.get('/search/:query', async (req, res) => {
 // Create a new service request
 router.post('/request', async (req, res) => {
     try {
+        console.log('Received service request with body:', JSON.stringify(req.body, null, 2));
+        
         const { 
-            customer_id, 
-            service_type, 
-            description, 
-            latitude, 
-            longitude, 
+            customer_id,
+            service_type,
+            description,
+            latitude,
+            longitude,
             address,
             landmark,
             city,
@@ -84,13 +104,25 @@ router.post('/request', async (req, res) => {
             scheduled_date,
             time_slot,
             payment_method,
+            payment_id,
             amount
         } = req.body;
         
-        console.log('Received request body:', req.body);
+        console.log('Parsed request fields:', {
+            customer_id,
+            service_type,
+            address,
+            city,
+            pincode,
+            scheduled_date,
+            time_slot,
+            payment_method,
+            payment_id,
+            amount
+        });
         
         // Validate required fields
-        if (!customer_id || !service_type || !address || !city || !pincode || !scheduled_date || !time_slot || !payment_method || !amount) {
+        if (!customer_id || !service_type || !address || !city || !pincode || !scheduled_date || !time_slot || !payment_method || !payment_id || !amount) {
             console.log('Missing fields validation failed:', {
                 customer_id: !!customer_id,
                 service_type: !!service_type,
@@ -100,9 +132,24 @@ router.post('/request', async (req, res) => {
                 scheduled_date: !!scheduled_date,
                 time_slot: !!time_slot,
                 payment_method: !!payment_method,
+                payment_id: !!payment_id,
                 amount: !!amount
             });
-            return res.status(400).json({ message: 'Missing required fields' });
+            return res.status(400).json({ 
+                message: 'Missing required fields',
+                missing: {
+                    customer_id: !customer_id,
+                    service_type: !service_type,
+                    address: !address,
+                    city: !city,
+                    pincode: !pincode,
+                    scheduled_date: !scheduled_date,
+                    time_slot: !time_slot,
+                    payment_method: !payment_method,
+                    payment_id: !payment_id,
+                    amount: !amount
+                }
+            });
         }
 
         // Validate date format
@@ -119,20 +166,11 @@ router.post('/request', async (req, res) => {
             return res.status(400).json({ message: 'Invalid pincode format' });
         }
 
-        // Handle location point
-        let locationQuery = 'NULL';
-        let locationParams = [];
-        
-        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
-            locationQuery = 'point($4, $5)';
-            locationParams = [longitude, latitude];
-        }
-
-        const queryParams = [
+        // Prepare base parameters
+        const baseParams = [
             customer_id, 
             service_type, 
             description || '', 
-            ...locationParams,
             address,
             landmark || '',
             city,
@@ -140,17 +178,29 @@ router.post('/request', async (req, res) => {
             scheduled_date,
             time_slot,
             payment_method,
+            payment_id,
             parseFloat(amount)
         ];
 
-        const placeholders = Array.from({ length: queryParams.length }, (_, i) => `$${i + 1}`);
+        // Handle location point
+        let locationParams = [];
+        let locationFields = '';
+        let locationValues = '';
         
+        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+            locationFields = ', latitude, longitude';
+            locationValues = ', $13, $14';  // Since we have 12 base parameters
+            locationParams = [parseFloat(latitude), parseFloat(longitude)];
+        }
+
+        // Combine all parameters
+        const queryParams = [...baseParams, ...locationParams];
+
         const query = `
             INSERT INTO service_requests (
                 customer_id, 
                 service_type, 
-                description, 
-                location, 
+                description,
                 address,
                 landmark,
                 city,
@@ -158,11 +208,10 @@ router.post('/request', async (req, res) => {
                 scheduled_date,
                 time_slot,
                 payment_method,
-                amount
+                payment_id,
+                amount${locationFields}
             ) VALUES (
-                $1, $2, $3, 
-                ${locationQuery}, 
-                ${placeholders.slice(locationParams.length + 3).join(', ')}
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12${locationValues}
             ) 
             RETURNING *`;
             
@@ -184,6 +233,58 @@ router.post('/request', async (req, res) => {
             position: err.position
         });
         res.status(500).json({ message: err.message || 'Server error' });
+    }
+});
+
+// Create payment order (Demo version)
+router.post('/create-payment', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        
+        // Ensure amount is a valid number and greater than 0
+        const parsedAmount = parseFloat(amount);
+        if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+            console.error('Invalid amount received:', amount);
+            return res.status(400).json({ message: 'Invalid amount. Amount must be a positive number.' });
+        }
+
+        console.log('Creating demo payment order for amount:', parsedAmount);
+        
+        // Create a dummy order response
+        const dummyOrder = {
+            id: 'order_demo_' + Date.now(),
+            amount: Math.round(parsedAmount * 100),
+            currency: 'INR',
+            receipt: 'receipt_demo_' + Date.now(),
+            status: 'created'
+        };
+
+        console.log('Demo payment order created:', dummyOrder);
+        res.json(dummyOrder);
+    } catch (err) {
+        console.error('Error creating demo payment:', err);
+        res.status(500).json({ message: 'Error creating payment order: ' + (err.message || 'Unknown error') });
+    }
+});
+
+// Verify payment (Demo version)
+router.post('/verify-payment', async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id } = req.body;
+        
+        if (!razorpay_order_id || !razorpay_payment_id) {
+            return res.status(400).json({ message: 'Missing payment details' });
+        }
+
+        // Always return success for demo
+        res.json({ 
+            status: 'success',
+            message: 'Demo payment verified successfully',
+            payment_id: razorpay_payment_id || ('pay_demo_' + Date.now())
+        });
+    } catch (err) {
+        console.error('Error verifying demo payment:', err);
+        res.status(500).json({ message: 'Error verifying payment' });
     }
 });
 
@@ -293,6 +394,72 @@ router.get('/request/:requestId/location', async (req, res) => {
     } catch (err) {
         console.error('Error fetching service request location:', err);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get user's orders
+router.get('/my-orders', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const query = `
+            SELECT 
+                sr.request_id,
+                sr.service_id,
+                s.name as service_name,
+                s.description as service_description,
+                sr.status,
+                sr.scheduled_date,
+                sr.time_slot,
+                sr.address,
+                sr.landmark,
+                sr.city,
+                sr.pincode,
+                sr.payment_method,
+                sr.payment_id,
+                sr.amount,
+                sr.created_at
+            FROM service_requests sr
+            JOIN services s ON sr.service_id = s.id
+            WHERE sr.user_id = $1
+            ORDER BY sr.created_at DESC
+        `;
+        
+        const result = await pool.query(query, [userId]);
+        
+        // Group orders by payment_id
+        const orders = result.rows.reduce((acc, order) => {
+            if (!acc[order.payment_id]) {
+                acc[order.payment_id] = {
+                    payment_id: order.payment_id,
+                    payment_method: order.payment_method,
+                    scheduled_date: order.scheduled_date,
+                    time_slot: order.time_slot,
+                    address: order.address,
+                    landmark: order.landmark,
+                    city: order.city,
+                    pincode: order.pincode,
+                    created_at: order.created_at,
+                    total_amount: 0,
+                    services: []
+                };
+            }
+            
+            acc[order.payment_id].services.push({
+                request_id: order.request_id,
+                service_name: order.service_name,
+                service_description: order.service_description,
+                status: order.status,
+                amount: order.amount
+            });
+            
+            acc[order.payment_id].total_amount += parseFloat(order.amount);
+            return acc;
+        }, {});
+
+        res.json(Object.values(orders));
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        res.status(500).json({ message: 'Error fetching orders' });
     }
 });
 

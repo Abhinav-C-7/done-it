@@ -10,7 +10,10 @@ const Cart = ({ items, removeFromCart, total }) => {
         navigate('/checkout', { 
             state: { 
                 cartItems: items,
-                total: total 
+                subtotal: total,
+                bookingFee: 100,
+                serviceFee: 49,
+                total: total + 149
             }
         });
     };
@@ -59,13 +62,17 @@ const Cart = ({ items, removeFromCart, total }) => {
                             <span className="text-gray-600">Subtotal</span>
                             <span className="font-medium">₹{total}</span>
                         </div>
+                        <div className="flex justify-between items-center mb-2 text-sm">
+                            <span className="text-gray-600">Booking Fee</span>
+                            <span className="font-medium">₹100</span>
+                        </div>
                         <div className="flex justify-between items-center mb-3 text-sm">
                             <span className="text-gray-600">Service Fee</span>
                             <span className="font-medium">₹49</span>
                         </div>
                         <div className="flex justify-between items-center font-medium">
                             <span>Total</span>
-                            <span>₹{total + 49}</span>
+                            <span>₹{total + 149}</span>
                         </div>
                     </div>
                     <button

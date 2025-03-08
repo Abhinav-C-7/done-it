@@ -108,7 +108,24 @@ const extractAddressComponents = (osmAddress) => {
 const Checkout = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { cartItems, total } = location.state || { cartItems: [], total: 0 };
+    const { user } = useAuth();
+    
+    // Get cart state with default values
+    const cartState = location.state || {};
+    const cartItems = cartState.cartItems || [];
+    const total = parseFloat(cartState.total || 0);
+    const bookingFee = parseFloat(cartState.bookingFee || 49);
+    const serviceFee = parseFloat(cartState.serviceFee || 0);
+
+    // If no items in cart, redirect to services
+    useEffect(() => {
+        if (cartItems.length === 0) {
+            navigate('/services');
+        }
+    }, [cartItems, navigate]);
+
+    const totalAmount = parseFloat((total + bookingFee + serviceFee).toFixed(2));
+
     const [showModal, setShowModal] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [address, setAddress] = useState('');
@@ -124,7 +141,6 @@ const Checkout = () => {
         pincode: '',
         date: '',
         timeSlot: '',
-        paymentMethod: 'cash',
         latitude: '',
         longitude: ''
     });
@@ -137,7 +153,7 @@ const Checkout = () => {
         "02:00 PM - 04:00 PM",
         "04:00 PM - 06:00 PM"
     ];
-    const { user } = useAuth();
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -145,6 +161,62 @@ const Checkout = () => {
             [name]: value
         }));
     };
+    const createServiceRequests = async (paymentId) => {
+        try {
+            // Create a service request for each item in the cart
+            console.log('User data:', user);
+            
+            const orderPromises = cartItems.map(async (item) => {
+                // Parse and clean amount, add booking fee divided by number of items
+                const bookingFeePerItem = bookingFee / cartItems.length;
+                const serviceFeePerItem = serviceFee / cartItems.length;
+                const itemPrice = parseFloat(item.price);
+                const cleanAmount = itemPrice + bookingFeePerItem + serviceFeePerItem;
+                
+                const requestData = {
+                    customer_id: user.id, // Changed from user.user_id to user.id
+                    service_type: item.type,
+                    description: `Service requested for ${item.type}. Includes booking fee: ₹${bookingFeePerItem.toFixed(2)}, service fee: ₹${serviceFeePerItem.toFixed(2)}`,
+                    latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+                    longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+                    address: formData.address.trim(),
+                    landmark: (formData.landmark || '').trim(),
+                    city: formData.city.trim(),
+                    pincode: formData.pincode.toString().trim(),
+                    scheduled_date: new Date(formData.date).toISOString().split('T')[0],
+                    time_slot: formData.timeSlot.trim(),
+                    payment_method: 'demo',
+                    payment_id: paymentId,
+                    amount: cleanAmount
+                };
+
+                console.log('Creating service request with data:', requestData);
+                const response = await fetch('http://localhost:3000/api/services/request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to create service request');
+                }
+
+                const responseData = await response.json();
+                console.log('Service request created:', responseData);
+                return responseData;
+            });
+
+            return await Promise.all(orderPromises);
+        } catch (error) {
+            console.error('Error creating service requests:', error);
+            throw error;
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -165,70 +237,84 @@ const Checkout = () => {
                 return;
             }
 
-            // Format date to YYYY-MM-DD
-            const formattedDate = new Date(formData.date).toISOString().split('T')[0];
+            // Calculate total amount in rupees
+            console.log('Sending payment request with amount:', totalAmount);
 
-            // Create a service request for each item in the cart
-            const orderPromises = cartItems.map(async (item) => {
-                // Parse and clean amount
-                const cleanAmount = parseFloat(item.price.toString().replace(/[^\d.]/g, ''));
-                
-                const requestData = {
-                    customer_id: user.user_id,
-                    service_type: item.type,
-                    description: `Service requested for ${item.type}. Quantity: ${item.quantity || 1}`,
-                    latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-                    longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-                    address: formData.address.trim(),
-                    landmark: (formData.landmark || '').trim(),
-                    city: formData.city.trim(),
-                    pincode: formData.pincode.toString().trim(),
-                    scheduled_date: formattedDate,
-                    time_slot: formData.timeSlot.trim(),
-                    payment_method: (formData.paymentMethod || 'cash').trim(),
-                    amount: cleanAmount
-                };
-
-                // Debug log
-                console.log('Sending request data:', requestData);
-                console.log('User object:', user);
-
-                const response = await fetch('http://localhost:5000/api/services/request', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to create service request');
-                }
-
-                const responseData = await response.json();
-                console.log('Response from server:', responseData);
-                return responseData;
+            // Create Razorpay order
+            const response = await fetch('http://localhost:3000/api/services/create-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ amount: totalAmount })
             });
 
-            const orderResponses = await Promise.all(orderPromises);
-            
-            // Prepare order details for confirmation page
-            const orderDetails = {
-                request_id: orderResponses[0].request_id,
-                services: cartItems,
-                total: total,
-                scheduled_date: formattedDate,
-                time_slot: formData.timeSlot,
-                address: formData.address,
-                landmark: formData.landmark || '',
-                city: formData.city,
-                pincode: formData.pincode,
-                payment_method: formData.paymentMethod || 'cash'
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to create payment order');
+            }
+
+            const order = await response.json();
+            console.log('Payment order created:', order);
+
+            // Create dummy Razorpay handler for demo
+            const demoRazorpayHandler = {
+                open: async function() {
+                    try {
+                        // Simulate payment success
+                        const demoResponse = {
+                            razorpay_order_id: order.id,
+                            razorpay_payment_id: 'pay_demo_' + Date.now(),
+                        };
+
+                        console.log('Demo payment successful:', demoResponse);
+                        
+                        // Verify payment
+                        const verification = await fetch('http://localhost:3000/api/services/verify-payment', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            },
+                            body: JSON.stringify(demoResponse)
+                        });
+
+                        if (!verification.ok) {
+                            const errorData = await verification.json();
+                            throw new Error(errorData.message || 'Payment verification failed');
+                        }
+
+                        console.log('Demo payment verified, creating service requests...');
+                        // Create service requests after successful payment
+                        const orderResponses = await createServiceRequests(demoResponse.razorpay_payment_id);
+                        console.log('Service requests created:', orderResponses);
+
+                        // Navigate to confirmation page
+                        const orderDetails = {
+                            request_id: orderResponses[0].request_id,
+                            services: cartItems,
+                            total: totalAmount,
+                            scheduled_date: new Date(formData.date).toISOString().split('T')[0],
+                            time_slot: formData.timeSlot,
+                            address: formData.address,
+                            landmark: formData.landmark || '',
+                            city: formData.city,
+                            pincode: formData.pincode,
+                            payment_method: 'demo',
+                            payment_id: demoResponse.razorpay_payment_id
+                        };
+
+                        navigate('/order-confirmation', { state: { orderDetails } });
+                    } catch (error) {
+                        console.error('Error in demo payment:', error);
+                        alert(error.message || 'Error processing your demo payment');
+                    }
+                }
             };
 
-            // Navigate to confirmation page with order details
-            navigate('/order-confirmation', { state: { orderDetails } });
+            // Use demo payment handler
+            demoRazorpayHandler.open();
         } catch (error) {
             console.error('Error placing order:', error);
             alert(error.message || 'Failed to place order. Please try again.');
@@ -424,6 +510,18 @@ const Checkout = () => {
     };
 
     useEffect(() => {
+        // Load Razorpay script
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+        
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    useEffect(() => {
         if (showMap && selectedLocation && !map) {
             setTimeout(() => {
                 const mapInstance = L.map('map').setView([selectedLocation.lat, selectedLocation.lng], 16);
@@ -561,8 +659,8 @@ const Checkout = () => {
                                             className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                             </svg>
                                             Select Address
                                         </button>
@@ -623,7 +721,8 @@ const Checkout = () => {
                                                     value={formData.pincode}
                                                     onChange={handleInputChange}
                                                     required
-                                                    pattern="[0-9]{6}"
+                                                    pattern="\d{6}"
+                                                    title="Please enter a valid 6-digit pincode"
                                                     disabled={isAddressConfirmed && !isEditingAddress}
                                                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400 disabled:bg-gray-50 disabled:cursor-not-allowed"
                                                 />
@@ -631,6 +730,24 @@ const Checkout = () => {
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                                                 </svg>
                                             </div>
+                                        </div>
+
+                                        <div className="relative">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Address
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="address"
+                                                value={formData.address}
+                                                onChange={handleInputChange}
+                                                required
+                                                disabled={isAddressConfirmed && !isEditingAddress}
+                                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                                            />
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                            </svg>
                                         </div>
 
                                         {(!isAddressConfirmed || isEditingAddress) && (
@@ -688,13 +805,11 @@ const Checkout = () => {
                                             value={formData.timeSlot}
                                             onChange={handleInputChange}
                                             required
-                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400 appearance-none"
+                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-yellow-400 focus:border-yellow-400"
                                         >
                                             <option value="">Select a time slot</option>
-                                            {timeSlots.map(slot => (
-                                                <option key={slot} value={slot}>
-                                                    {slot}
-                                                </option>
+                                            {timeSlots.map((slot, index) => (
+                                                <option key={index} value={slot}>{slot}</option>
                                             ))}
                                         </select>
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -704,55 +819,13 @@ const Checkout = () => {
                                 </div>
                             </div>
 
-                            {/* Payment Method Section */}
-                            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
-                                <div className="flex items-center mb-6">
-                                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                    </div>
-                                    <h2 className="text-lg font-semibold text-gray-800">Payment Method</h2>
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-yellow-400 cursor-pointer transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="paymentMethod"
-                                            value="cash"
-                                            checked={formData.paymentMethod === 'cash'}
-                                            onChange={handleInputChange}
-                                            className="h-4 w-4 text-yellow-400 focus:ring-yellow-400"
-                                        />
-                                        <div className="ml-3">
-                                            <span className="font-medium text-gray-700">Cash on Service</span>
-                                            <p className="text-sm text-gray-500">Pay after the service is completed</p>
-                                        </div>
-                                    </label>
-                                    <label className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-yellow-400 cursor-pointer transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="paymentMethod"
-                                            value="upi"
-                                            checked={formData.paymentMethod === 'upi'}
-                                            onChange={handleInputChange}
-                                            className="h-4 w-4 text-yellow-400 focus:ring-yellow-400"
-                                        />
-                                        <div className="ml-3">
-                                            <span className="font-medium text-gray-700">UPI</span>
-                                            <p className="text-sm text-gray-500">Pay securely via UPI</p>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
                             <button
                                 type="submit"
                                 className="w-full bg-yellow-400 text-black py-4 px-6 rounded-lg font-medium hover:bg-yellow-500 transition-colors shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
                             >
                                 <span>Place Order</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
                             </button>
                         </form>
@@ -764,7 +837,7 @@ const Checkout = () => {
                             <div className="flex items-center mb-6">
                                 <div className="p-2 bg-yellow-100 rounded-lg mr-3">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                     </svg>
                                 </div>
                                 <h2 className="text-lg font-semibold text-gray-800">Order Summary</h2>
@@ -786,11 +859,15 @@ const Checkout = () => {
                                     </div>
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-gray-600">Service Fee</span>
-                                        <span className="font-medium text-gray-800">₹49</span>
+                                        <span className="font-medium text-gray-800">₹{serviceFee}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-gray-600">Booking Fee</span>
+                                        <span className="font-medium text-gray-800">₹{bookingFee}</span>
                                     </div>
                                     <div className="flex justify-between items-center pt-2 border-t border-gray-100 font-medium">
                                         <span>Total</span>
-                                        <span>₹{total + 49}</span>
+                                        <span>₹{totalAmount}</span>
                                     </div>
                                 </div>
                             </div>

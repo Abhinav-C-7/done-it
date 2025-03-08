@@ -13,8 +13,8 @@ const pool = require('./config/db');
 const path = require('path');
 
 // Routes
-const authRoutes = require('./routes/auth');
-const serviceRoutes = require('./routes/services');
+const authRoute = require('./routes/auth');
+const servicesRoute = require('./routes/services');
 const workerRoutes = require('./routes/workers');
 
 // Middleware
@@ -29,8 +29,8 @@ app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/services', serviceRoutes);
+app.use('/api/auth', authRoute);
+app.use('/api/services', servicesRoute);
 app.use('/api/workers', workerRoutes);
 
 // Socket.io connection handling
@@ -56,7 +56,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Serving static files from: ${path.join(__dirname, 'public', 'images')}`);

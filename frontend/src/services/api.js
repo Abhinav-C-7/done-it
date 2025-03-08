@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-    baseURL: 'http://localhost:5000'
+    baseURL: 'http://localhost:3000'
 });
 
 // Service-related API calls
@@ -48,6 +48,31 @@ export const serviceApi = {
         } catch (error) {
             console.error('Error searching services:', error);
             throw error.response?.data || { message: 'Error searching services' };
+        }
+    }
+};
+
+// Payment-related API calls
+export const paymentApi = {
+    createPayment: async (amount) => {
+        try {
+            const response = await axiosInstance.post('/api/services/create-payment', { amount });
+            console.log('Payment order created:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating payment:', error);
+            throw error.response?.data || { message: 'Error creating payment' };
+        }
+    },
+
+    verifyPayment: async (paymentData) => {
+        try {
+            const response = await axiosInstance.post('/api/services/verify-payment', paymentData);
+            console.log('Payment verified:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error verifying payment:', error);
+            throw error.response?.data || { message: 'Error verifying payment' };
         }
     }
 };
