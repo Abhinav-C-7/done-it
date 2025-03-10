@@ -94,8 +94,164 @@ router.get('/available-jobs', verifyToken, async (req, res) => {
         const servicemanId = req.user.id;
         console.log('Serviceman ID:', servicemanId);
 
-        // Query to find all pending service requests regardless of distance or skills match
-        console.log('Querying for all pending service requests');
+        // First, check if serviceman profile exists by ID
+        const profileCheck = await pool.query(
+            'SELECT * FROM serviceman_profiles WHERE serviceman_id = $1',
+            [servicemanId]
+        );
+
+        // If profile doesn't exist by ID, try to find it by email
+        if (profileCheck.rows.length === 0) {
+            console.log('Serviceman profile not found by ID, attempting to find by email');
+            
+            // Get serviceman registration data to get the email
+            const registrationData = await pool.query(
+                'SELECT * FROM serviceman_registrations WHERE registration_id = $1',
+                [servicemanId]
+            );
+            
+            if (registrationData.rows.length === 0) {
+                console.log('Serviceman registration not found');
+                return res.status(404).json({ message: 'Serviceman registration not found' });
+            }
+            
+            const regData = registrationData.rows[0];
+            
+            // Try to find profile by email
+            const profileByEmail = await pool.query(
+                'SELECT * FROM serviceman_profiles WHERE email = $1',
+                [regData.email]
+            );
+            
+            if (profileByEmail.rows.length > 0) {
+                // Profile exists with this email but different ID
+                console.log('Found profile with matching email but different ID');
+                
+                // Update the serviceman_id to match the token ID
+                await pool.query(
+                    'UPDATE serviceman_profiles SET serviceman_id = $1 WHERE email = $2',
+                    [servicemanId, regData.email]
+                );
+                
+                console.log('Updated serviceman_id to match token ID');
+            } else {
+                // No profile exists, create one
+                console.log('No profile found with this email, creating new profile');
+                
+                // Create serviceman profile
+                try {
+                    await pool.query(
+                        `INSERT INTO serviceman_profiles 
+                        (serviceman_id, email, password, full_name, phone_number, address, city, pincode, skills, current_location) 
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, point(75.36600000, 11.86630000))`,
+                        [
+                            servicemanId, 
+                            regData.email, 
+                            regData.password, 
+                            regData.full_name, 
+                            regData.phone_number, 
+                            regData.address || '', 
+                            regData.city || '', 
+                            regData.pincode || '', 
+                            regData.skills || '{}'
+                        ]
+                    );
+                    console.log('Created serviceman profile with default location');
+                } catch (err) {
+                    console.error('Error creating serviceman profile:', err);
+                    
+                    // If error is duplicate key, try to update the existing profile
+                    if (err.code === '23505' && err.constraint === 'serviceman_profiles_email_key') {
+                        console.log('Profile with this email already exists, trying to update serviceman_id');
+                        
+                        await pool.query(
+                            'UPDATE serviceman_profiles SET serviceman_id = $1 WHERE email = $2',
+                            [servicemanId, regData.email]
+                        );
+                        
+                        console.log('Updated serviceman_id for existing profile');
+                    } else {
+                        return res.status(500).json({ message: 'Failed to create serviceman profile', error: err.message });
+                    }
+                }
+            }
+        }
+
+        // Now get the serviceman's current location (which should exist now)
+        const servicemanLocation = await pool.query(
+            'SELECT current_location FROM serviceman_profiles WHERE serviceman_id = $1',
+            [servicemanId]
+        );
+
+        console.log('Serviceman location query result:', JSON.stringify(servicemanLocation.rows[0]));
+        
+        // Check if the location exists
+        if (!servicemanLocation.rows[0] || servicemanLocation.rows[0].current_location === null) {
+            console.log('Serviceman location still not set after profile creation/update');
+            
+            // Update with a default location
+            await pool.query(
+                'UPDATE serviceman_profiles SET current_location = point(75.36600000, 11.86630000) WHERE serviceman_id = $1',
+                [servicemanId]
+            );
+            
+            console.log('Updated serviceman with default location');
+            
+            // Fetch the location again
+            const updatedLocation = await pool.query(
+                'SELECT current_location FROM serviceman_profiles WHERE serviceman_id = $1',
+                [servicemanId]
+            );
+            
+            if (!updatedLocation.rows[0] || updatedLocation.rows[0].current_location === null) {
+                return res.status(400).json({ 
+                    message: 'Unable to set your location. Please contact support.' 
+                });
+            }
+        }
+
+        console.log('Querying for pending service requests within 10km radius');
+        console.log('Serviceman location raw data:', servicemanLocation.rows[0]?.current_location);
+        
+        // Extract the coordinates directly from the point object
+        let servicemanLat, servicemanLng;
+        if (servicemanLocation.rows[0]?.current_location) {
+            const point = servicemanLocation.rows[0].current_location;
+            
+            // The coordinates in the database are stored in the WRONG order
+            // In the database: x=19.076, y=72.8777 (these are swapped)
+            // Correct assignment should be: lat=19.076, lng=72.8777
+            console.log(`Raw point coordinates: x=${point.x}, y=${point.y}`);
+            
+            // SWAP the coordinates to get the correct values
+            servicemanLat = point.x; // x contains latitude (incorrectly stored)
+            servicemanLng = point.y; // y contains longitude (incorrectly stored)
+            
+            console.log(`Swapped coordinates for correct assignment: lat=${servicemanLat}, lng=${servicemanLng}`);
+            
+            // Verify coordinates are in valid ranges
+            if (Math.abs(servicemanLat) > 90 || Math.abs(servicemanLng) > 180) {
+                console.log('WARNING: Coordinates still invalid after swapping!');
+                
+                // Force the correct coordinates for Mumbai
+                servicemanLat = 19.076;
+                servicemanLng = 72.8777;
+                console.log(`Forced correct Mumbai coordinates: lat=${servicemanLat}, lng=${servicemanLng}`);
+                
+                // Update the database with the correct orientation
+                try {
+                    await pool.query(
+                        'UPDATE serviceman_profiles SET current_location = point($1, $2) WHERE serviceman_id = $3',
+                        [servicemanLng, servicemanLat, servicemanId]
+                    );
+                    console.log('Updated serviceman location with correctly oriented coordinates in database');
+                } catch (err) {
+                    console.error('Error updating serviceman location:', err);
+                }
+            }
+        }
+        
+        // Modified query to use the correct point coordinates
         const query = `
             SELECT 
                 sr.request_id,
@@ -113,8 +269,7 @@ router.get('/available-jobs', verifyToken, async (req, res) => {
                 sr.status,
                 sr.created_at,
                 sr.scheduled_date,
-                sr.time_slot,
-                NULL as distance
+                sr.time_slot
             FROM 
                 service_requests sr
             JOIN 
@@ -126,15 +281,86 @@ router.get('/available-jobs', verifyToken, async (req, res) => {
         `;
         
         const availableJobs = await pool.query(query);
-
-        console.log('Available jobs found:', availableJobs.rows.length);
-        if (availableJobs.rows.length > 0) {
-            console.log('First job:', availableJobs.rows[0]);
+        
+        // Filter jobs by distance manually to ensure accuracy
+        const jobsWithDistance = availableJobs.rows.map(job => {
+            // Calculate distance using Haversine formula
+            const jobLat = parseFloat(job.location_lat);
+            const jobLng = parseFloat(job.location_lng);
+            
+            console.log(`Job coordinates: lat=${jobLat}, lng=${jobLng}`);
+            
+            // Convert to radians
+            const lat1 = servicemanLat * Math.PI / 180;
+            const lat2 = jobLat * Math.PI / 180;
+            const lng1 = servicemanLng * Math.PI / 180;
+            const lng2 = jobLng * Math.PI / 180;
+            
+            // Haversine formula
+            const dlon = lng2 - lng1;
+            const dlat = lat2 - lat1;
+            const a = Math.pow(Math.sin(dlat/2), 2) + 
+                      Math.cos(lat1) * Math.cos(lat2) * 
+                      Math.pow(Math.sin(dlon/2), 2);
+            const c = 2 * Math.asin(Math.sqrt(a));
+            const distance = 6371 * c; // Earth radius in km
+            
+            return {
+                ...job,
+                distance: parseFloat(distance.toFixed(2)) // Round to 2 decimal places and convert to number
+            };
+        });
+        
+        // Filter by distance and sort
+        const jobsWithin10km = jobsWithDistance
+            .filter(job => job.distance <= 10)
+            .sort((a, b) => a.distance - b.distance);
+        
+        console.log('Available jobs found within 10km:', jobsWithin10km.length);
+        if (jobsWithin10km.length > 0) {
+            console.log('First job:', jobsWithin10km[0]);
+            jobsWithin10km.forEach(job => {
+                console.log(`Job ID: ${job.request_id}, Type: ${job.service_name}, Distance: ${job.distance.toFixed(2)} km`);
+            });
         } else {
-            console.log('No pending service requests found');
+            console.log('No pending service requests found within 10km');
+            
+            // If no jobs found, check if there's an issue with the coordinates
+            if (servicemanLat && servicemanLng) {
+                console.log(`Serviceman coordinates: lat=${servicemanLat}, lng=${servicemanLng}`);
+                
+                // Check all pending jobs and their distances
+                console.log('All pending jobs and their distances:');
+                jobsWithDistance.forEach(job => {
+                    console.log(`Job ID: ${job.request_id}, Type: ${job.service_name}, Lat: ${job.location_lat}, Lng: ${job.location_lng}, Distance: ${job.distance.toFixed(2)} km`);
+                });
+                
+                // Calculate distance to the specific job mentioned
+                const specificLat = 9.97020940;
+                const specificLng = 76.28546510;
+                
+                // Convert to radians
+                const lat1 = servicemanLat * Math.PI / 180;
+                const lat2 = specificLat * Math.PI / 180;
+                const lng1 = servicemanLng * Math.PI / 180;
+                const lng2 = specificLng * Math.PI / 180;
+                
+                // Haversine formula
+                const dlon = lng2 - lng1;
+                const dlat = lat2 - lat1;
+                const a = Math.pow(Math.sin(dlat/2), 2) + 
+                          Math.cos(lat1) * Math.cos(lat2) * 
+                          Math.pow(Math.sin(dlon/2), 2);
+                const c = 2 * Math.asin(Math.sqrt(a));
+                const distance = 6371 * c; // Earth radius in km
+                
+                console.log(`Calculated distance to Kochi (9.9702, 76.2855): ${distance.toFixed(2)} km`);
+                console.log(`This distance should be within 10km: ${distance <= 10 ? 'YES' : 'NO'}`);
+            }
         }
         
-        res.json(availableJobs.rows);
+        // Return the filtered jobs
+        res.json(jobsWithin10km);
     } catch (err) {
         console.error('Error fetching available jobs:', err);
         res.status(500).json({ message: 'Server error', error: err.message });

@@ -310,9 +310,11 @@ const AvailableJobs = () => {
                         <p className="mb-1">{job.address}</p>
                         <p className="mb-1">{job.city}, {job.pincode}</p>
                         {job.landmark && <p className="mb-0 fst-italic">Landmark: {job.landmark}</p>}
-                        {job.distance !== null && (
-                          <p className="text-muted mt-2 small">
-                            {Math.round(job.distance / 1000)} km away
+                        {job.distance !== null && job.distance !== undefined && (
+                          <p className="text-muted mt-2 small fw-bold">
+                            <span className="badge bg-info text-dark rounded-pill">
+                              {job.distance} km away
+                            </span>
                           </p>
                         )}
                       </div>
