@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import post from "../assets/images/post.png";
 import homefull from "../assets/images/home-full.png";
 import profile from "../assets/images/profile.png";
+import '../styles/sidebar.css';
 
 function Layout({ children }) {
     return (
@@ -17,7 +18,7 @@ function Layout({ children }) {
                 <Sidebar />
                 
                 {/* Main Content */}
-                <div className="flex-1 ml-16 transition-all duration-300 p-4">
+                <div className="flex-1 ml-16 transition-all duration-300 p-4 main-content">
                     <div className="max-w-7xl mx-auto">
                         {children}
                     </div>

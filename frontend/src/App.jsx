@@ -19,6 +19,7 @@ import OrderConfirmation from './pages/OrderConfirmation';
 import WorkerDashboard from './pages/WorkerDashboard';
 import WorkerWelcome from './pages/WorkerWelcome';
 import Orders from './pages/Orders';
+import Notifications from './pages/Notifications';
 
 // PrivateRoute component
 function PrivateRoute({ children, userType }) {
@@ -90,6 +91,14 @@ function App() {
                   element={
                     <PrivateRoute userType="customer">
                       <Orders />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <PrivateRoute userType="customer">
+                      <Notifications />
                     </PrivateRoute>
                   }
                 />

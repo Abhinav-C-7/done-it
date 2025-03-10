@@ -392,16 +392,60 @@ router.post('/accept-job/:requestId', verifyToken, async (req, res) => {
         await pool.query('BEGIN');
 
         try {
-            // Update request status to assigned
+            // Update request status to accepted
             await pool.query(
                 'UPDATE service_requests SET status = $1, assigned_serviceman = $2, updated_at = NOW() WHERE request_id = $3',
-                ['assigned', servicemanId, requestId]
+                ['accepted', servicemanId, requestId]
+            );
+
+            // Get serviceman details to include in notification
+            const servicemanDetails = await pool.query(
+                'SELECT full_name, phone_number FROM serviceman_profiles WHERE serviceman_id = $1',
+                [servicemanId]
+            );
+
+            if (servicemanDetails.rows.length === 0) {
+                throw new Error('Serviceman profile not found');
+            }
+
+            const serviceman = servicemanDetails.rows[0];
+
+            // Get customer ID from the service request
+            const customerQuery = await pool.query(
+                'SELECT customer_id FROM service_requests WHERE request_id = $1',
+                [requestId]
+            );
+
+            if (customerQuery.rows.length === 0) {
+                throw new Error('Service request not found');
+            }
+
+            const customerId = customerQuery.rows[0].customer_id;
+
+            // Create notification for the customer
+            await pool.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    customerId, 
+                    'customer', 
+                    'Service Request Accepted', 
+                    `Your service request has been accepted by ${serviceman.full_name}. Contact: ${serviceman.phone_number}`,
+                    'accepted',
+                    requestId,
+                    false
+                ]
             );
 
             // Commit transaction
             await pool.query('COMMIT');
 
-            res.json({ message: 'Job accepted successfully' });
+            res.json({ 
+                message: 'Job accepted successfully',
+                servicemanName: serviceman.full_name,
+                servicemanPhone: serviceman.phone_number
+            });
         } catch (err) {
             // Rollback transaction in case of error
             await pool.query('ROLLBACK');

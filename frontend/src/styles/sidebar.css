@@ -1,0 +1,9 @@
+/* Sidebar styles */
+#sidebar:hover .sidebar-text {
+  display: block;
+}
+
+/* Adjust main content when sidebar expands */
+#sidebar:hover + .main-content {
+  margin-left: 16rem; /* 64px = 16rem */
+}

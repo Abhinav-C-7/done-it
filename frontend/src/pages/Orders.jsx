@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Navbar from '../components/Navbar';
+import Layout from '../components/Layout';
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
@@ -81,8 +81,7 @@ const Orders = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
+        <Layout>
             <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
                 <h1 className="text-3xl font-bold text-gray-900 mb-6">My Orders</h1>
                 
@@ -200,7 +199,7 @@ const Orders = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </Layout>
     );
 };
 
