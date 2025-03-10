@@ -17,6 +17,7 @@ const authRoute = require('./routes/auth');
 const servicesRoute = require('./routes/services');
 const workerRoutes = require('./routes/workers');
 const ordersRoutes = require('./routes/orders');
+const servicemanRoutes = require('./routes/serviceman');
 
 // Middleware
 app.use(cors({
@@ -34,6 +35,7 @@ app.use('/api/auth', authRoute);
 app.use('/api/services', servicesRoute);
 app.use('/api/workers', workerRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/serviceman', servicemanRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {

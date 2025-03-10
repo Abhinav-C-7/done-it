@@ -85,6 +85,14 @@ function App() {
                     </PrivateRoute>
                   }
                 />
+                <Route
+                  path="/my-orders"
+                  element={
+                    <PrivateRoute userType="customer">
+                      <Orders />
+                    </PrivateRoute>
+                  }
+                />
 
                 {/* Protected customer routes */}
                 <Route

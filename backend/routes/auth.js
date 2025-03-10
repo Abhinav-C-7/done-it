@@ -358,4 +358,125 @@ router.post('/serviceman/login', async (req, res) => {
     }
 });
 
+// Get current user profile (me)
+router.get('/me', async (req, res) => {
+    try {
+        console.log('GET /auth/me endpoint hit');
+        // Get token from header
+        const authHeader = req.headers.authorization;
+        console.log('Auth header in /me:', authHeader);
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log('No valid auth header found in /me');
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        console.log('Token extracted in /me:', token ? 'Token exists' : 'No token');
+        
+        if (!token) {
+            console.log('No token found after split in /me');
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded token in /auth/me:', decoded);
+        
+        // Check user type and get profile
+        if (decoded.type === 'serviceman') {
+            console.log('User is a serviceman');
+            // Get serviceman profile
+            const serviceman = await pool.query(
+                'SELECT * FROM serviceman_profiles WHERE serviceman_id = $1',
+                [decoded.id]
+            );
+            
+            console.log('Serviceman query result:', serviceman.rows.length > 0 ? 'Found' : 'Not found');
+            
+            // Even if profile is not found, return basic info from token
+            if (serviceman.rows.length === 0) {
+                console.log('Returning basic serviceman info from token');
+                return res.json({
+                    serviceman_id: decoded.id,
+                    type: 'serviceman'
+                });
+            }
+            
+            // Remove password from response
+            const { password, ...servicemanData } = serviceman.rows[0];
+            
+            return res.json({
+                ...servicemanData,
+                type: 'serviceman'
+            });
+        } else {
+            console.log('User is a customer');
+            // Get customer profile
+            const customer = await pool.query(
+                'SELECT * FROM customers WHERE user_id = $1',
+                [decoded.id]
+            );
+            
+            console.log('Customer query result:', customer.rows.length > 0 ? 'Found' : 'Not found');
+            
+            if (customer.rows.length === 0) {
+                return res.status(404).json({ message: 'Customer profile not found' });
+            }
+            
+            // Remove password from response
+            const { password, ...customerData } = customer.rows[0];
+            
+            return res.json({
+                ...customerData,
+                type: 'customer'
+            });
+        }
+    } catch (err) {
+        console.error('Error fetching user profile:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Test endpoint for debugging
+router.get('/test', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        console.log('Auth header in /test:', authHeader);
+        
+        if (!authHeader) {
+            return res.json({ message: 'No authorization header provided' });
+        }
+        
+        if (!authHeader.startsWith('Bearer ')) {
+            return res.json({ message: 'Authorization header does not start with Bearer' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        console.log('Token extracted in /test:', token);
+        
+        if (!token) {
+            return res.json({ message: 'No token found after split' });
+        }
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Decoded token in /test:', decoded);
+            return res.json({ 
+                message: 'Token valid', 
+                decoded,
+                env: {
+                    jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not set'
+                }
+            });
+        } catch (err) {
+            console.error('Token verification error in /test:', err.message);
+            return res.json({ message: 'Token invalid', error: err.message });
+        }
+    } catch (err) {
+        console.error('Error in test endpoint:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;

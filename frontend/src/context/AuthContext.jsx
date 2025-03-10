@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 const AuthContext = createContext();
 
@@ -21,7 +22,7 @@ export function AuthProvider({ children }) {
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             
             // Verify token and get user data
-            axios.get('http://localhost:3000/api/auth/verify')
+            axios.get(`${API_BASE_URL}/auth/verify`)
                 .then(response => {
                     if (response.data?.user) {
                         setUser({
@@ -56,44 +57,67 @@ export function AuthProvider({ children }) {
             const isServiceman = email.includes('@serviceman.doneit.com');
             const endpoint = isServiceman ? '/api/auth/serviceman/login' : '/api/auth/login';
 
-            const response = await axios.post(`http://localhost:3000${endpoint}`, {
+            console.log(`Attempting login with ${isServiceman ? 'serviceman' : 'customer'} endpoint: ${endpoint}`);
+
+            const response = await axios.post(`${API_BASE_URL.replace('/api', '')}${endpoint}`, {
                 email,
                 password
             });
 
-            const { token, user: userData } = response.data;
+            console.log('Login response:', response.data);
+
+            // Handle different response structures
+            let userData, token;
+            
+            if (isServiceman) {
+                // Handle serviceman response
+                token = response.data.token;
+                userData = response.data.user;
+            } else {
+                // Handle customer response
+                token = response.data.token;
+                userData = response.data.user;
+            }
             
             // Store token and user data
             localStorage.setItem('token', token);
-            localStorage.setItem('userType', isServiceman ? 'serviceman' : 'customer');
+            localStorage.setItem('userType', userData.type || (isServiceman ? 'serviceman' : 'customer'));
             
-            setUser({ 
+            const userWithType = { 
                 ...userData, 
                 token,
-                type: isServiceman ? 'serviceman' : 'customer'
-            });
+                type: userData.type || (isServiceman ? 'serviceman' : 'customer')
+            };
+            
+            setUser(userWithType);
+            console.log('User set in context:', userWithType);
 
             // Set default authorization header
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-            // Redirect based on user type
-            if (isServiceman) {
-                navigate('/serviceman-dashboard');
-            } else {
-                navigate('/');
-            }
+            return response.data;
         } catch (err) {
             console.error('Login error:', err);
-            setError(err.response?.data?.message || 'Failed to login');
+            const errorMessage = err.response?.data?.message || 'Failed to login';
+            setError(errorMessage);
+            throw err;
         } finally {
             setLoading(false);
         }
     };
 
+    const logout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userType');
+        delete axios.defaults.headers.common['Authorization'];
+        setUser(null);
+        navigate('/login');
+    };
+
     const register = async (formData) => {
         try {
             console.log('Sending registration data:', formData);
-            const response = await axios.post('http://localhost:3000/api/auth/register', formData);
+            const response = await axios.post(`${API_BASE_URL.replace('/api', '')}/api/auth/register`, formData);
             return response.data;
         } catch (error) {
             console.error('Registration error details:', error.response?.data);
@@ -106,7 +130,7 @@ export function AuthProvider({ children }) {
 
     const registerServiceman = async (formData) => {
         try {
-            const response = await fetch('http://localhost:3000/api/auth/serviceman/register', {
+            const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/auth/serviceman/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -129,26 +153,20 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userType');
-        delete axios.defaults.headers.common['Authorization'];
-        setUser(null);
-    };
-
     const value = {
         user,
+        loading,
+        error,
         login,
         logout,
         register,
         registerServiceman,
-        loading,
-        error
+        token: user?.token
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 }

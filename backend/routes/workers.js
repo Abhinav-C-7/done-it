@@ -1,5 +1,33 @@
 const router = require('express').Router();
 const pool = require('../config/db');
+const jwt = require('jsonwebtoken');
+
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+    try {
+        // Get token from Authorization header
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        
+        if (!token) {
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Add user info to request
+        req.user = decoded;
+        next();
+    } catch (err) {
+        res.status(401).json({ message: 'Invalid token.' });
+    }
+};
 
 // Update worker profile
 router.put('/profile/:workerId', async (req, res) => {
@@ -37,6 +65,34 @@ router.get('/profile/:workerId', async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update serviceman location
+router.post('/update-location', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (!req.user.email?.includes('@serviceman.doneit.com')) {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const { latitude, longitude } = req.body;
+        const servicemanId = req.user.id;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ message: 'Latitude and longitude are required' });
+        }
+
+        // Update location in the database
+        await pool.query(
+            'UPDATE serviceman_profiles SET current_location = point($1, $2), last_active_at = NOW() WHERE serviceman_id = $3',
+            [longitude, latitude, servicemanId]
+        );
+
+        res.json({ message: 'Location updated successfully' });
+    } catch (err) {
+        console.error('Error updating location:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 

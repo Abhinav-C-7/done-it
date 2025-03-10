@@ -10,23 +10,35 @@ function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
+        
         try {
+            console.log('Attempting to login with:', { email });
             const response = await login(email, password);
-            if (response.serviceman) {
-                // Serviceman login successful
-                navigate('/worker/welcome');
-            } else if (response.user) {
-                // Customer login successful
+            console.log('Login response received:', response);
+            
+            // Determine user type and redirect accordingly
+            const isServiceman = email.includes('@serviceman.doneit.com');
+            
+            if (isServiceman) {
+                console.log('Redirecting serviceman to dashboard');
+                navigate('/serviceman-dashboard');
+            } else {
+                console.log('Redirecting customer to home');
                 navigate('/', { replace: true });
             }
         } catch (err) {
-            setError(err.message || 'Login failed');
+            console.error('Login error:', err);
+            setError(err.message || 'Login failed. Please check your credentials.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -85,9 +97,10 @@ function Login() {
                                 <div className="flex flex-col space-y-4">
                                     <button
                                         type="submit"
-                                        className="w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 transform transition-all duration-200 hover:scale-[1.02]"
+                                        disabled={loading}
+                                        className={`w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 transform transition-all duration-200 ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
                                     >
-                                        Sign In
+                                        {loading ? 'Signing In...' : 'Sign In'}
                                     </button>
                                     
                                     <div className="text-center">

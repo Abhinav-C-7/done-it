@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Testing Tool</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="Enter email" value="john@serviceman.doneit.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter password" value="password123">
+            </div>
+            <button onclick="login()">Login</button>
+            <div id="token-display" style="margin-top: 12px;"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Test Endpoints</h2>
+            <div class="form-group">
+                <label for="endpoint">Endpoint</label>
+                <select id="endpoint">
+                    <option value="/api/auth/test">Auth Test</option>
+                    <option value="/api/auth/me">Get Profile</option>
+                    <option value="/api/orders/nearby-requests">Get Nearby Requests</option>
+                    <option value="/api/workers/update-location">Update Location (POST)</option>
+                </select>
+            </div>
+            <div class="form-group" id="request-body-container" style="display: none;">
+                <label for="request-body">Request Body (JSON)</label>
+                <textarea id="request-body" rows="4" style="width: 100%;">{"latitude": 40.7128, "longitude": -74.0060}</textarea>
+            </div>
+            <button onclick="testEndpoint()">Test Endpoint</button>
+            <div id="response-container" style="margin-top: 12px;">
+                <h3>Response:</h3>
+                <pre id="response-data">No response yet</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentToken = '';
+        
+        // Show/hide request body based on endpoint selection
+        document.getElementById('endpoint').addEventListener('change', function() {
+            const endpoint = this.value;
+            const requestBodyContainer = document.getElementById('request-body-container');
+            
+            if (endpoint === '/api/workers/update-location') {
+                requestBodyContainer.style.display = 'block';
+            } else {
+                requestBodyContainer.style.display = 'none';
+            }
+        });
+        
+        async function login() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                // Determine if the user is a serviceman or customer
+                const isServiceman = email.includes('@serviceman.doneit.com');
+                const endpoint = isServiceman ? '/api/auth/serviceman/login' : '/api/auth/login';
+                
+                const response = await fetch(`http://localhost:3000${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentToken = data.token;
+                    document.getElementById('token-display').innerHTML = `
+                        <div style="background-color: #e8f5e9; padding: 8px; border-radius: 4px;">
+                            <p style="margin: 0; color: #2e7d32;">Login successful!</p>
+                            <p style="margin: 4px 0 0; font-size: 12px; word-break: break-all;">Token: ${currentToken}</p>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('token-display').innerHTML = `
+                        <div style="background-color: #ffebee; padding: 8px; border-radius: 4px;">
+                            <p style="margin: 0; color: #c62828;">Login failed: ${data.message || 'Unknown error'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('token-display').innerHTML = `
+                    <div style="background-color: #ffebee; padding: 8px; border-radius: 4px;">
+                        <p style="margin: 0; color: #c62828;">Error: ${error.message}</p>
+                    </div>
+                `;
+                console.error('Login error:', error);
+            }
+        }
+        
+        async function testEndpoint() {
+            try {
+                if (!currentToken) {
+                    document.getElementById('response-data').textContent = 'Please login first to get a token';
+                    return;
+                }
+                
+                const endpoint = document.getElementById('endpoint').value;
+                const isPost = endpoint === '/api/workers/update-location';
+                const url = `http://localhost:3000${endpoint}`;
+                
+                const options = {
+                    method: isPost ? 'POST' : 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                if (isPost) {
+                    const requestBody = document.getElementById('request-body').value;
+                    options.body = requestBody;
+                }
+                
+                console.log('Making request to:', url);
+                console.log('With options:', options);
+                
+                const response = await fetch(url, options);
+                const data = await response.json();
+                
+                document.getElementById('response-data').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('response-data').textContent = `Error: ${error.message}`;
+                console.error('API test error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
