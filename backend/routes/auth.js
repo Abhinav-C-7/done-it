@@ -525,4 +525,110 @@ router.get('/test', async (req, res) => {
     }
 });
 
+// Update user profile
+router.put('/update-profile', async (req, res) => {
+    try {
+        // Get token from header
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        
+        if (!token) {
+            return res.status(401).json({ message: 'Access denied. No token provided.' });
+        }
+        
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        
+        // Extract data from request
+        const { full_name, phone_number, address, profile_picture } = req.body;
+        
+        // Update based on user type
+        if (decoded.type === 'serviceman') {
+            // Update serviceman profile
+            const updateQuery = `
+                UPDATE serviceman_profiles 
+                SET 
+                    full_name = COALESCE($1, full_name),
+                    phone_number = COALESCE($2, phone_number),
+                    address = COALESCE($3, address)
+                    ${profile_picture ? ', profile_picture = $4' : ''}
+                WHERE serviceman_id = $${profile_picture ? '5' : '4'}
+                RETURNING *
+            `;
+            
+            const queryParams = [
+                full_name,
+                phone_number,
+                address
+            ];
+            
+            if (profile_picture) {
+                queryParams.push(profile_picture);
+            }
+            
+            queryParams.push(decoded.id);
+            
+            const result = await pool.query(updateQuery, queryParams);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: 'Serviceman profile not found' });
+            }
+            
+            // Remove password from response
+            const { password, ...updatedData } = result.rows[0];
+            
+            return res.json({
+                ...updatedData,
+                type: 'serviceman'
+            });
+        } else {
+            // Update customer profile
+            const updateQuery = `
+                UPDATE customers 
+                SET 
+                    full_name = COALESCE($1, full_name),
+                    phone_number = COALESCE($2, phone_number),
+                    address = COALESCE($3, address)
+                    ${profile_picture ? ', profile_picture = $4' : ''}
+                WHERE user_id = $${profile_picture ? '5' : '4'}
+                RETURNING *
+            `;
+            
+            const queryParams = [
+                full_name,
+                phone_number,
+                address
+            ];
+            
+            if (profile_picture) {
+                queryParams.push(profile_picture);
+            }
+            
+            queryParams.push(decoded.id);
+            
+            const result = await pool.query(updateQuery, queryParams);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: 'Customer profile not found' });
+            }
+            
+            // Remove password from response
+            const { password, ...updatedData } = result.rows[0];
+            
+            return res.json({
+                ...updatedData,
+                type: 'customer'
+            });
+        }
+    } catch (err) {
+        console.error('Error updating profile:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;
