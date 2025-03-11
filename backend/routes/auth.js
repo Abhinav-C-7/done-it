@@ -159,19 +159,65 @@ router.get('/verify', async (req, res) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        console.log('Decoded token in /auth/verify:', decoded);
         
-        const user = await pool.query(
-            'SELECT user_id, email, full_name, phone_number FROM customers WHERE user_id = $1',
-            [decoded.id]
-        );
-
-        if (user.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
+        // Check user type and get profile
+        if (decoded.type === 'serviceman') {
+            console.log('User is a serviceman');
+            // Get serviceman profile
+            const serviceman = await pool.query(
+                'SELECT * FROM serviceman_profiles WHERE serviceman_id = $1',
+                [decoded.id]
+            );
+            
+            console.log('Serviceman query result:', serviceman.rows.length > 0 ? 'Found' : 'Not found');
+            
+            // Even if profile is not found, return basic info from token
+            if (serviceman.rows.length === 0) {
+                console.log('Returning basic serviceman info from token');
+                return res.json({
+                    user: {
+                        serviceman_id: decoded.id,
+                        type: 'serviceman'
+                    }
+                });
+            }
+            
+            // Remove password from response
+            const { password, ...servicemanData } = serviceman.rows[0];
+            
+            return res.json({
+                user: {
+                    ...servicemanData,
+                    type: 'serviceman'
+                }
+            });
+        } else {
+            console.log('User is a customer');
+            // Get customer profile
+            const customer = await pool.query(
+                'SELECT * FROM customers WHERE user_id = $1',
+                [decoded.id]
+            );
+            
+            console.log('Customer query result:', customer.rows.length > 0 ? 'Found' : 'Not found');
+            
+            if (customer.rows.length === 0) {
+                return res.status(404).json({ message: 'Customer profile not found' });
+            }
+            
+            // Remove password from response
+            const { password, ...customerData } = customer.rows[0];
+            
+            return res.json({
+                user: {
+                    ...customerData,
+                    type: 'customer'
+                }
+            });
         }
-
-        res.json({ user: user.rows[0] });
     } catch (err) {
-        console.error(err.message);
+        console.error('Token verification error:', err.message);
         if (err.name === 'JsonWebTokenError') {
             return res.status(401).json({ message: 'Invalid token' });
         }

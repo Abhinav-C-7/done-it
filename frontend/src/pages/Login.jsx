@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from "../components/Navbar";
+import ProgressBar from "../components/ProgressBar";
 import post from "../assets/images/post.png";
 import homefull from "../assets/images/home-full.png";
 import profile from "../assets/images/profile.png";
@@ -44,6 +45,7 @@ function Login() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-yellow-100">
+            <ProgressBar isLoading={loading} loadingText="Signing you in" />
             <div className="flex flex-col items-center justify-center min-h-screen px-4">
                 <div className="w-full max-w-md">
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -100,7 +102,7 @@ function Login() {
                                         disabled={loading}
                                         className={`w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 transform transition-all duration-200 ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
                                     >
-                                        {loading ? 'Signing In...' : 'Sign In'}
+                                        Sign In
                                     </button>
                                     
                                     <div className="text-center">

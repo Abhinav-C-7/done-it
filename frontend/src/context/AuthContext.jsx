@@ -2,6 +2,7 @@ import { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import ProgressBar from '../components/ProgressBar';
 
 const AuthContext = createContext();
 
@@ -13,10 +14,14 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [loggingOut, setLoggingOut] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
         const token = localStorage.getItem('token');
+        const userType = localStorage.getItem('userType');
+        
         if (token) {
             // Set the default authorization header
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -24,20 +29,26 @@ export function AuthProvider({ children }) {
             // Verify token and get user data
             axios.get(`${API_BASE_URL}/auth/verify`)
                 .then(response => {
+                    console.log('Auth verification response:', response.data);
                     if (response.data?.user) {
                         setUser({
                             ...response.data.user,
-                            token
+                            token,
+                            type: response.data.user.type || userType
                         });
                     } else {
                         // Invalid response format
+                        console.error('Invalid auth verification response format:', response.data);
                         localStorage.removeItem('token');
+                        localStorage.removeItem('userType');
                         delete axios.defaults.headers.common['Authorization'];
                     }
                 })
-                .catch(() => {
+                .catch(error => {
                     // If token is invalid, remove it
+                    console.error('Auth verification error:', error);
                     localStorage.removeItem('token');
+                    localStorage.removeItem('userType');
                     delete axios.defaults.headers.common['Authorization'];
                 })
                 .finally(() => {
@@ -107,11 +118,31 @@ export function AuthProvider({ children }) {
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userType');
-        delete axios.defaults.headers.common['Authorization'];
-        setUser(null);
-        navigate('/login');
+        // Show confirmation dialog first
+        setShowLogoutConfirm(true);
+    };
+
+    const confirmLogout = () => {
+        setShowLogoutConfirm(false);
+        setLoggingOut(true);
+        
+        // Simulate a logout process with a delay
+        setTimeout(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userType');
+            delete axios.defaults.headers.common['Authorization'];
+            setUser(null);
+            
+            // Navigate after a short delay to allow the animation to be seen
+            setTimeout(() => {
+                setLoggingOut(false);
+                navigate('/login');
+            }, 500);
+        }, 1000);
+    };
+
+    const cancelLogout = () => {
+        setShowLogoutConfirm(false);
     };
 
     const register = async (formData) => {
@@ -161,11 +192,17 @@ export function AuthProvider({ children }) {
         logout,
         register,
         registerServiceman,
-        token: user?.token
+        token: user?.token,
+        loggingOut,
+        showLogoutConfirm,
+        confirmLogout,
+        cancelLogout
     };
 
     return (
         <AuthContext.Provider value={value}>
+            <ProgressBar isLoading={loading} loadingText="Loading your account" />
+            <ProgressBar isLoading={loggingOut} loadingText="Logging you out" />
             {children}
         </AuthContext.Provider>
     );

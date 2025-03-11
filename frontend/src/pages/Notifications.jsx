@@ -1,91 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Layout from '../components/Layout';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
 function Notifications() {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { 
+        notifications, 
+        loading, 
+        error, 
+        markAsRead, 
+        markAllAsRead,
+        addMockNotification
+    } = useNotifications();
 
-    useEffect(() => {
-        // Redirect if not logged in
+    // Mark all notifications as read when the page is opened
+    React.useEffect(() => {
+        if (user && notifications.length > 0) {
+            markAllAsRead();
+        }
+    }, [user, notifications.length]);
+
+    // Redirect if not logged in
+    React.useEffect(() => {
         if (!user) {
             navigate('/login');
-            return;
         }
-
-        const fetchNotifications = async () => {
-            try {
-                setLoading(true);
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    setError('Authentication token not found');
-                    setLoading(false);
-                    return;
-                }
-
-                // Fetch real notifications from the backend
-                const response = await axios.get(`${API_BASE_URL}/notifications`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.data && Array.isArray(response.data)) {
-                    setNotifications(response.data);
-                } else {
-                    // Fallback to sample notifications if API doesn't return expected format
-                    console.warn('API returned unexpected format, using sample data');
-                    setNotifications(getSampleNotifications());
-                }
-                setLoading(false);
-            } catch (err) {
-                console.error('Error fetching notifications:', err);
-                setError(err.message || 'Failed to fetch notifications');
-                
-                // Fallback to sample notifications on error
-                setNotifications(getSampleNotifications());
-                setLoading(false);
-            }
-        };
-
-        fetchNotifications();
     }, [navigate, user]);
-
-    // Fallback sample notifications
-    const getSampleNotifications = () => {
-        return [
-            {
-                notification_id: 1,
-                title: 'Service Request Accepted',
-                message: 'Your cleaning service request has been accepted by John Doe. Contact: +91 9876543210',
-                created_at: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-                read: false,
-                type: 'accepted'
-            },
-            {
-                notification_id: 2,
-                title: 'Service Completed',
-                message: 'Your plumbing service has been completed. Please rate your experience',
-                created_at: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-                read: true,
-                type: 'completed'
-            },
-            {
-                notification_id: 3,
-                title: 'Service Provider Arrived',
-                message: 'Your electrician has arrived at the location',
-                created_at: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-                read: true,
-                type: 'status'
-            }
-        ];
-    };
 
     const formatTime = (timestamp) => {
         const now = new Date();
@@ -207,73 +152,23 @@ function Notifications() {
         }
     };
 
-    const markAsRead = async (id) => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                console.error('Authentication token not found');
-                return;
-            }
-
-            // Call API to mark notification as read
-            await axios.put(`${API_BASE_URL}/notifications/${id}/read`, {}, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            // Update local state
-            setNotifications(notifications.map(notification => 
-                notification.notification_id === id ? { ...notification, read: true } : notification
-            ));
-        } catch (err) {
-            console.error('Error marking notification as read:', err);
-            // Still update UI even if API call fails
-            setNotifications(notifications.map(notification => 
-                notification.notification_id === id ? { ...notification, read: true } : notification
-            ));
-        }
-    };
-
-    const markAllAsRead = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                console.error('Authentication token not found');
-                return;
-            }
-
-            // Call API to mark all notifications as read
-            await axios.put(`${API_BASE_URL}/notifications/read-all`, {}, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            // Update local state
-            setNotifications(notifications.map(notification => ({ ...notification, read: true })));
-        } catch (err) {
-            console.error('Error marking all notifications as read:', err);
-            // Still update UI even if API call fails
-            setNotifications(notifications.map(notification => ({ ...notification, read: true })));
-        }
-    };
-
     return (
         <Layout>
             <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-                    {notifications.some(n => !n.read) && (
-                        <button 
-                            onClick={markAllAsRead}
-                            className="text-sm font-medium text-yellow-600 hover:text-yellow-800"
-                        >
-                            Mark all as read
-                        </button>
-                    )}
+                    <div className="flex space-x-4">
+                        {notifications.length > 0 && (
+                            <button 
+                                onClick={markAllAsRead}
+                                className="text-sm font-medium text-yellow-600 hover:text-yellow-800"
+                            >
+                                Mark all as read
+                            </button>
+                        )}
+                    </div>
                 </div>
-                
+
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
@@ -303,32 +198,44 @@ function Notifications() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {notifications.map((notification) => (
-                            <div 
-                                key={notification.notification_id} 
-                                className={`bg-white shadow overflow-hidden sm:rounded-lg hover:shadow-md transition-shadow duration-200 ${!notification.read ? 'border-l-4 border-yellow-500' : ''}`}
-                                onClick={() => markAsRead(notification.notification_id)}
-                            >
-                                <div className="px-4 py-5 sm:p-6">
-                                    <div className="flex items-start">
-                                        {getNotificationIcon(notification.type)}
-                                        <div className="ml-4 flex-1">
-                                            <div className="flex justify-between">
-                                                <h3 className={`text-lg leading-6 font-medium ${!notification.read ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
-                                                    {notification.title}
-                                                </h3>
-                                                <p className="text-sm text-gray-500">
-                                                    {formatTime(notification.created_at)}
+                        {notifications.map((notification) => {
+                            // Handle different property naming conventions between API and mock data
+                            const id = notification.id || notification.notification_id;
+                            const title = notification.title || notification.message?.split('.')[0] || 'Notification';
+                            const message = notification.message;
+                            const timestamp = notification.created_at || notification.createdAt;
+                            const isRead = notification.read === true;
+                            const type = notification.type || 'status';
+                            
+                            return (
+                                <div 
+                                    key={id} 
+                                    className={`bg-white shadow overflow-hidden sm:rounded-lg hover:shadow-md transition-shadow duration-200 ${!isRead ? 'border-l-4 border-yellow-500' : ''}`}
+                                    onClick={() => markAsRead(id)}
+                                >
+                                    <div className="px-4 py-5 sm:p-6">
+                                        <div className="flex items-start">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className={`text-lg font-medium ${!isRead ? 'text-gray-900' : 'text-gray-700'}`}>
+                                                        {title}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500">
+                                                        {formatTime(timestamp)}
+                                                    </p>
+                                                </div>
+                                                <p className={`mt-1 max-w-2xl text-sm ${!isRead ? 'text-gray-900' : 'text-gray-500'}`}>
+                                                    {message}
                                                 </p>
                                             </div>
-                                            <p className={`mt-1 max-w-2xl text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-500'}`}>
-                                                {notification.message}
-                                            </p>
+                                            <div className="ml-5 flex-shrink-0">
+                                                {getNotificationIcon(type)}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

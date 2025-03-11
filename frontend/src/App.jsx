@@ -2,8 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider } from './context/LocationContext';
 import { CartProvider } from './context/CartContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
+import LogoutConfirmation from './components/LogoutConfirmation';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -28,37 +30,37 @@ import MyJobs from './components/MyJobs';
 
 // PrivateRoute component
 function PrivateRoute({ children, userType }) {
-  const { user } = useAuth();
-  const isServiceman = user?.email?.includes('@serviceman.doneit.com');
-  const isWorker = user?.type === 'worker';
+  const { user, loading } = useAuth();
   
+  // Show loading state while authentication is being checked
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500"></div>
+      </div>
+    );
+  }
+  
+  // Redirect to login if not authenticated
   if (!user) {
     return <Navigate to="/login" />;
   }
 
-  // Redirect servicemen to their dashboard if they try to access customer routes
-  if (userType === 'customer' && isServiceman) {
-    return <Navigate to="/serviceman/dashboard" />;
+  const userIsServiceman = user.type === 'serviceman';
+  const userIsWorker = user.type === 'worker';
+  const userIsCustomer = user.type === 'customer';
+
+  // Redirect based on user type and requested route type
+  if (userType === 'customer' && !userIsCustomer) {
+    return userIsServiceman ? <Navigate to="/serviceman/dashboard" /> : <Navigate to="/worker/dashboard" />;
   }
 
-  // Redirect customers to home if they try to access serviceman routes
-  if (userType === 'serviceman' && !isServiceman) {
-    return <Navigate to="/" />;
+  if (userType === 'serviceman' && !userIsServiceman) {
+    return userIsCustomer ? <Navigate to="/" /> : <Navigate to="/worker/dashboard" />;
   }
 
-  // Redirect servicemen to their dashboard if they try to access worker routes
-  if (userType === 'worker' && isServiceman) {
-    return <Navigate to="/serviceman/dashboard" />;
-  }
-
-  // Redirect workers to their dashboard if they try to access serviceman routes
-  if (userType === 'serviceman' && isWorker) {
-    return <Navigate to="/worker/dashboard" />;
-  }
-
-  // Redirect workers to their dashboard if they try to access customer routes
-  if (userType === 'customer' && isWorker) {
-    return <Navigate to="/worker/dashboard" />;
+  if (userType === 'worker' && !userIsWorker) {
+    return userIsCustomer ? <Navigate to="/" /> : <Navigate to="/serviceman/dashboard" />;
   }
 
   return children;
@@ -69,162 +71,165 @@ function App() {
     <AuthProvider>
       <LocationProvider>
         <CartProvider>
-          <div className="app">
-            <Navbar />
-            <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/serviceman-register" element={<ServicemanRegister />} />
-                <Route path="/worker/welcome" element={<WorkerWelcome />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/services/:serviceType" element={<ServiceDetails />} />
-                <Route path="/service-request" element={<ServiceRequest />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/order-confirmation" element={<OrderConfirmation />} />
-                <Route
-                  path="/orders"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Orders />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/my-orders"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Orders />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/all-orders"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <AllOrders />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/notifications"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Notifications />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Settings />
-                    </PrivateRoute>
-                  }
-                />
+          <NotificationProvider>
+            <div className="app">
+              <Navbar />
+              <LogoutConfirmation />
+              <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/serviceman-register" element={<ServicemanRegister />} />
+                  <Route path="/worker/welcome" element={<WorkerWelcome />} />
+                  <Route path="/services" element={<Services />} />
+                  <Route path="/services/:serviceType" element={<ServiceDetails />} />
+                  <Route path="/service-request" element={<ServiceRequest />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                  <Route
+                    path="/orders"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Orders />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-orders"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Orders />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/all-orders"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <AllOrders />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Notifications />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Settings />
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Protected customer routes */}
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Home />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <Profile />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/customer/dashboard"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <CustomerDashboard />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/service/request"
-                  element={
-                    <PrivateRoute userType="customer">
-                      <ServiceRequest />
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Protected customer routes */}
+                  <Route
+                    path="/"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Home />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <Profile />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/customer/dashboard"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <CustomerDashboard />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/service/request"
+                    element={
+                      <PrivateRoute userType="customer">
+                        <ServiceRequest />
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Protected worker routes */}
-                <Route
-                  path="/worker/dashboard"
-                  element={
-                    <PrivateRoute userType="worker">
-                      <WorkerDashboard />
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Protected worker routes */}
+                  <Route
+                    path="/worker/dashboard"
+                    element={
+                      <PrivateRoute userType="worker">
+                        <WorkerDashboard />
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Protected serviceman routes */}
-                <Route
-                  path="/serviceman/dashboard"
-                  element={
-                    <PrivateRoute userType="serviceman">
-                      <ServicemanDashboard />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/serviceman-dashboard"
-                  element={<Navigate to="/serviceman/dashboard" replace />}
-                />
-                <Route
-                  path="/serviceman/available-jobs"
-                  element={
-                    <PrivateRoute userType="serviceman">
-                      <div className="container mx-auto px-4 py-8">
-                        <h1 className="text-3xl font-bold mb-6">Available Jobs</h1>
-                        <AvailableJobs />
-                      </div>
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/serviceman/my-jobs"
-                  element={
-                    <PrivateRoute userType="serviceman">
-                      <div className="container mx-auto px-4 py-8">
-                        <h1 className="text-3xl font-bold mb-6">My Jobs</h1>
-                        <MyJobs />
-                      </div>
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/serviceman/earnings"
-                  element={
-                    <PrivateRoute userType="serviceman">
-                      <div className="container mx-auto px-4 py-8">
-                        <h1 className="text-3xl font-bold mb-6">Earnings</h1>
-                        <p>Your earnings information will appear here.</p>
-                      </div>
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/job/:requestId"
-                  element={
-                    <PrivateRoute userType="serviceman">
-                      <JobDetails />
-                    </PrivateRoute>
-                  }
-                />
-              </Routes>
+                  {/* Protected serviceman routes */}
+                  <Route
+                    path="/serviceman/dashboard"
+                    element={
+                      <PrivateRoute userType="serviceman">
+                        <ServicemanDashboard />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/serviceman-dashboard"
+                    element={<Navigate to="/serviceman/dashboard" replace />}
+                  />
+                  <Route
+                    path="/serviceman/available-jobs"
+                    element={
+                      <PrivateRoute userType="serviceman">
+                        <div className="container mx-auto px-4 py-8">
+                          <h1 className="text-3xl font-bold mb-6">Available Jobs</h1>
+                          <AvailableJobs />
+                        </div>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/serviceman/my-jobs"
+                    element={
+                      <PrivateRoute userType="serviceman">
+                        <div className="container mx-auto px-4 py-8">
+                          <h1 className="text-3xl font-bold mb-6">My Jobs</h1>
+                          <MyJobs />
+                        </div>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/serviceman/earnings"
+                    element={
+                      <PrivateRoute userType="serviceman">
+                        <div className="container mx-auto px-4 py-8">
+                          <h1 className="text-3xl font-bold mb-6">Earnings</h1>
+                          <p>Your earnings information will appear here.</p>
+                        </div>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/job/:requestId"
+                    element={
+                      <PrivateRoute userType="serviceman">
+                        <JobDetails />
+                      </PrivateRoute>
+                    }
+                  />
+                </Routes>
+              </div>
             </div>
-          </div>
+          </NotificationProvider>
         </CartProvider>
       </LocationProvider>
     </AuthProvider>
