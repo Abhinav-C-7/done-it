@@ -19,12 +19,17 @@ import OrderConfirmation from './pages/OrderConfirmation';
 import WorkerDashboard from './pages/WorkerDashboard';
 import WorkerWelcome from './pages/WorkerWelcome';
 import Orders from './pages/Orders';
+import AllOrders from './pages/AllOrders';
 import Notifications from './pages/Notifications';
+import Settings from './pages/Settings';
+import JobDetails from './pages/JobDetails';
+import AvailableJobs from './components/AvailableJobs';
+import MyJobs from './components/MyJobs';
 
 // PrivateRoute component
 function PrivateRoute({ children, userType }) {
   const { user } = useAuth();
-  const isServiceman = user?.type === 'serviceman';
+  const isServiceman = user?.email?.includes('@serviceman.doneit.com');
   const isWorker = user?.type === 'worker';
   
   if (!user) {
@@ -33,7 +38,7 @@ function PrivateRoute({ children, userType }) {
 
   // Redirect servicemen to their dashboard if they try to access customer routes
   if (userType === 'customer' && isServiceman) {
-    return <Navigate to="/serviceman-dashboard" />;
+    return <Navigate to="/serviceman/dashboard" />;
   }
 
   // Redirect customers to home if they try to access serviceman routes
@@ -43,7 +48,7 @@ function PrivateRoute({ children, userType }) {
 
   // Redirect servicemen to their dashboard if they try to access worker routes
   if (userType === 'worker' && isServiceman) {
-    return <Navigate to="/serviceman-dashboard" />;
+    return <Navigate to="/serviceman/dashboard" />;
   }
 
   // Redirect workers to their dashboard if they try to access serviceman routes
@@ -95,10 +100,26 @@ function App() {
                   }
                 />
                 <Route
+                  path="/all-orders"
+                  element={
+                    <PrivateRoute userType="customer">
+                      <AllOrders />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
                   path="/notifications"
                   element={
                     <PrivateRoute userType="customer">
                       <Notifications />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <PrivateRoute userType="customer">
+                      <Settings />
                     </PrivateRoute>
                   }
                 />
@@ -149,10 +170,55 @@ function App() {
 
                 {/* Protected serviceman routes */}
                 <Route
-                  path="/serviceman-dashboard"
+                  path="/serviceman/dashboard"
                   element={
                     <PrivateRoute userType="serviceman">
                       <ServicemanDashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/serviceman-dashboard"
+                  element={<Navigate to="/serviceman/dashboard" replace />}
+                />
+                <Route
+                  path="/serviceman/available-jobs"
+                  element={
+                    <PrivateRoute userType="serviceman">
+                      <div className="container mx-auto px-4 py-8">
+                        <h1 className="text-3xl font-bold mb-6">Available Jobs</h1>
+                        <AvailableJobs />
+                      </div>
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/serviceman/my-jobs"
+                  element={
+                    <PrivateRoute userType="serviceman">
+                      <div className="container mx-auto px-4 py-8">
+                        <h1 className="text-3xl font-bold mb-6">My Jobs</h1>
+                        <MyJobs />
+                      </div>
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/serviceman/earnings"
+                  element={
+                    <PrivateRoute userType="serviceman">
+                      <div className="container mx-auto px-4 py-8">
+                        <h1 className="text-3xl font-bold mb-6">Earnings</h1>
+                        <p>Your earnings information will appear here.</p>
+                      </div>
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/job/:requestId"
+                  element={
+                    <PrivateRoute userType="serviceman">
+                      <JobDetails />
                     </PrivateRoute>
                   }
                 />

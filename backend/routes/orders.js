@@ -265,4 +265,148 @@ router.post('/reject/:requestId', verifyToken, async (req, res) => {
     }
 });
 
+// Process payment for an order
+router.post('/payment', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a customer
+        if (req.user.type !== 'customer') {
+            return res.status(403).json({ message: 'Access denied. Not a customer.' });
+        }
+
+        const { order_id, amount } = req.body;
+        const customerId = req.user.id;
+
+        if (!order_id || !amount) {
+            return res.status(400).json({ message: 'Order ID and amount are required' });
+        }
+
+        // Start a transaction
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Check if the order belongs to this customer
+            const orderCheck = await client.query(
+                'SELECT * FROM service_requests WHERE payment_id = $1 AND customer_id = $2',
+                [order_id, customerId]
+            );
+
+            if (orderCheck.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ message: 'Order not found or does not belong to you' });
+            }
+
+            // Update all services in this order to completed and mark as paid
+            await client.query(
+                'UPDATE service_requests SET status = $1, payment_status = $2, updated_at = NOW() WHERE payment_id = $3 AND customer_id = $4',
+                ['completed', 'paid', order_id, customerId]
+            );
+
+            // Create a payment record (in a real app, this would integrate with a payment gateway)
+            await client.query(
+                `INSERT INTO payments 
+                (payment_id, customer_id, amount, payment_method, status, created_at) 
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (payment_id) DO UPDATE 
+                SET status = $5, updated_at = NOW()`,
+                [order_id, customerId, amount, 'card', 'completed']
+            );
+
+            // Create notification for the customer
+            await client.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    customerId, 
+                    'customer', 
+                    'Payment Successful', 
+                    `Your payment of ₹${amount} for order ${order_id.substring(0, 8)}... has been processed successfully.`,
+                    'payment',
+                    order_id,
+                    false
+                ]
+            );
+
+            await client.query('COMMIT');
+            res.json({ message: 'Payment processed successfully' });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            console.error('Transaction error:', err);
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error processing payment:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Withdraw a service request (only if it's still pending)
+router.delete('/withdraw/:requestId', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a customer
+        if (req.user.type !== 'customer') {
+            return res.status(403).json({ message: 'Access denied. Not a customer.' });
+        }
+
+        const { requestId } = req.params;
+        const customerId = req.user.id;
+
+        // Start a transaction
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Check if the request belongs to this customer and is still pending
+            const requestCheck = await client.query(
+                'SELECT * FROM service_requests WHERE request_id = $1 AND customer_id = $2 AND status = $3',
+                [requestId, customerId, 'pending']
+            );
+
+            if (requestCheck.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ 
+                    message: 'Service request not found, does not belong to you, or has already been accepted by a serviceman' 
+                });
+            }
+
+            // Update the request status to 'cancelled'
+            await client.query(
+                'UPDATE service_requests SET status = $1, updated_at = NOW() WHERE request_id = $2',
+                ['cancelled', requestId]
+            );
+
+            // Create notification for the customer
+            await client.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    customerId, 
+                    'customer', 
+                    'Service Request Withdrawn', 
+                    `Your service request for ${requestCheck.rows[0].service_type} has been successfully withdrawn.`,
+                    'withdrawal',
+                    requestId,
+                    false
+                ]
+            );
+
+            await client.query('COMMIT');
+            res.json({ message: 'Service request withdrawn successfully' });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            console.error('Transaction error:', err);
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error withdrawing service request:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;

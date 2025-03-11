@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
-function CustomerDashboard() {
+function AllOrders() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [orders, setOrders] = useState([]);
@@ -13,12 +12,7 @@ function CustomerDashboard() {
     const [error, setError] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showOrderModal, setShowOrderModal] = useState(false);
-    const [stats, setStats] = useState({
-        total: 0,
-        completed: 0,
-        pending: 0,
-        cancelled: 0
-    });
+    const [filter, setFilter] = useState('all'); // 'all', 'completed', 'pending', 'cancelled'
 
     useEffect(() => {
         // Redirect if not logged in
@@ -27,82 +21,101 @@ function CustomerDashboard() {
             return;
         }
 
-        const fetchOrders = async () => {
-            try {
-                // Get token from localStorage
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    setError('Authentication token not found');
-                    setLoading(false);
-                    return;
-                }
-
-                const response = await fetch(`${API_BASE_URL}/orders/my-orders`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch orders');
-                }
-
-                const data = await response.json();
-                setOrders(data);
-                
-                // Calculate stats
-                let completed = 0;
-                let pending = 0;
-                let cancelled = 0;
-                
-                data.forEach(order => {
-                    order.services.forEach(service => {
-                        if (service.status === 'completed') {
-                            completed++;
-                        } else if (service.status === 'cancelled') {
-                            cancelled++;
-                        } else {
-                            pending++;
-                        }
-                    });
-                });
-                
-                setStats({
-                    total: data.length,
-                    completed,
-                    pending,
-                    cancelled
-                });
-                
-                setLoading(false);
-            } catch (err) {
-                console.error('Error fetching orders:', err);
-                setError(err.message || 'Failed to fetch orders');
-                setLoading(false);
-            }
-        };
-
         fetchOrders();
-        
-        // Set up a polling interval to check for updates
-        const intervalId = setInterval(fetchOrders, 30000); // Poll every 30 seconds
-        
-        // Clean up on unmount
-        return () => clearInterval(intervalId);
     }, [user, navigate]);
-    
+
+    const fetchOrders = async () => {
+        try {
+            // Get token from localStorage
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Authentication token not found');
+                setLoading(false);
+                return;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/orders/my-orders`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch orders');
+            }
+
+            const data = await response.json();
+            setOrders(data);
+            setLoading(false);
+        } catch (err) {
+            console.error('Error fetching orders:', err);
+            setError(err.message || 'Failed to fetch orders');
+            setLoading(false);
+        }
+    };
+
     // Function to handle order click
     const handleOrderClick = (order) => {
         setSelectedOrder(order);
         setShowOrderModal(true);
     };
-    
+
     // Function to close the modal
     const closeModal = () => {
         setShowOrderModal(false);
         setSelectedOrder(null);
     };
-    
+
+    // Function to render progress status
+    const renderProgressStatus = (status) => {
+        // Map API status values to our progress steps
+        let mappedStatus = status;
+        
+        // Define the progression of statuses
+        const statuses = ['pending', 'assigned', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+        const statusLabels = {
+            'pending': 'Pending',
+            'assigned': 'Assigned',
+            'on_the_way': 'On the Way',
+            'arrived': 'Arrived',
+            'in_progress': 'In Progress',
+            'completed': 'Completed'
+        };
+        
+        // Find the index of the current status
+        const currentIndex = statuses.indexOf(mappedStatus);
+        
+        // If status is not found, default to pending (index 0)
+        const progressIndex = currentIndex === -1 ? 0 : currentIndex;
+        
+        return (
+            <div className="w-full mt-4">
+                <div className="flex justify-between mb-2">
+                    {statuses.map((s, index) => (
+                        <div key={s} className="text-xs text-center" style={{ width: '16.66%' }}>
+                            {statusLabels[s]}
+                        </div>
+                    ))}
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full">
+                    <div 
+                        className="h-full bg-yellow-500 rounded-full" 
+                        style={{ width: `${(progressIndex + 1) * 16.66}%` }}
+                    ></div>
+                </div>
+                <div className="flex justify-between mt-1">
+                    {statuses.map((s, index) => (
+                        <div 
+                            key={s} 
+                            className={`w-4 h-4 rounded-full ${index <= progressIndex ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                            style={{ marginLeft: index === 0 ? '0' : 'auto', marginRight: index === statuses.length - 1 ? '0' : 'auto' }}
+                        ></div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     // Function to handle payment
     const handlePayment = async (orderId, amount) => {
         try {
@@ -114,13 +127,16 @@ function CustomerDashboard() {
             
             // In a real app, this would integrate with a payment gateway
             // For now, we'll just simulate a successful payment
-            await axios.post(`${API_BASE_URL}/orders/payment`, {
-                order_id: orderId,
-                amount: amount
-            }, {
+            await fetch(`${API_BASE_URL}/orders/payment`, {
+                method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                }
+                },
+                body: JSON.stringify({
+                    order_id: orderId,
+                    amount: amount
+                })
             });
             
             // Update the order status locally
@@ -143,14 +159,14 @@ function CustomerDashboard() {
             // Close the modal
             closeModal();
             
-            // Show success message (in a real app, you might use a toast notification)
+            // Show success message
             alert('Payment successful!');
         } catch (err) {
             console.error('Payment error:', err);
             alert('Payment failed. Please try again.');
         }
     };
-    
+
     // Function to withdraw a service request
     const handleWithdraw = async (requestId) => {
         if (!confirm('Are you sure you want to withdraw this service request? This action cannot be undone.')) {
@@ -215,56 +231,19 @@ function CustomerDashboard() {
             alert(err.message || 'Failed to withdraw service request');
         }
     };
-    
-    // Function to render progress status
-    const renderProgressStatus = (status) => {
-        // Map API status values to our progress steps
-        let mappedStatus = status;
+
+    // Filter orders based on selected filter
+    const filteredOrders = orders.filter(order => {
+        if (filter === 'all') return true;
         
-        // Define the progression of statuses
-        const statuses = ['pending', 'assigned', 'on_the_way', 'arrived', 'in_progress', 'completed'];
-        const statusLabels = {
-            'pending': 'Pending',
-            'assigned': 'Assigned',
-            'on_the_way': 'On the Way',
-            'arrived': 'Arrived',
-            'in_progress': 'In Progress',
-            'completed': 'Completed'
-        };
-        
-        // Find the index of the current status
-        const currentIndex = statuses.indexOf(mappedStatus);
-        
-        // If status is not found, default to pending (index 0)
-        const progressIndex = currentIndex === -1 ? 0 : currentIndex;
-        
-        return (
-            <div className="w-full mt-4">
-                <div className="flex justify-between mb-2">
-                    {statuses.map((s, index) => (
-                        <div key={s} className="text-xs text-center" style={{ width: '16.66%' }}>
-                            {statusLabels[s]}
-                        </div>
-                    ))}
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full">
-                    <div 
-                        className="h-full bg-yellow-500 rounded-full" 
-                        style={{ width: `${(progressIndex + 1) * 16.66}%` }}
-                    ></div>
-                </div>
-                <div className="flex justify-between mt-1">
-                    {statuses.map((s, index) => (
-                        <div 
-                            key={s} 
-                            className={`w-4 h-4 rounded-full ${index <= progressIndex ? 'bg-yellow-500' : 'bg-gray-300'}`}
-                            style={{ marginLeft: index === 0 ? '0' : 'auto', marginRight: index === statuses.length - 1 ? '0' : 'auto' }}
-                        ></div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
+        // Check if any service in the order matches the filter
+        return order.services.some(service => {
+            if (filter === 'completed' && service.status === 'completed') return true;
+            if (filter === 'pending' && ['pending', 'assigned', 'on_the_way', 'arrived', 'in_progress'].includes(service.status)) return true;
+            if (filter === 'cancelled' && service.status === 'cancelled') return true;
+            return false;
+        });
+    });
 
     if (loading) {
         return (
@@ -289,40 +268,62 @@ function CustomerDashboard() {
     return (
         <Layout>
             <div className="container mx-auto px-4 py-8">
-                <h1 className="text-3xl font-bold mb-8">Customer Dashboard</h1>
-                
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-400">
-                        <h3 className="text-gray-500 text-sm font-medium">Total Orders</h3>
-                        <p className="text-3xl font-bold">{stats.total}</p>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-400">
-                        <h3 className="text-gray-500 text-sm font-medium">Completed</h3>
-                        <p className="text-3xl font-bold">{stats.completed}</p>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-400">
-                        <h3 className="text-gray-500 text-sm font-medium">Pending</h3>
-                        <p className="text-3xl font-bold">{stats.pending}</p>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-400">
-                        <h3 className="text-gray-500 text-sm font-medium">Cancelled</h3>
-                        <p className="text-3xl font-bold">{stats.cancelled}</p>
-                    </div>
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">All Orders</h1>
+                    <button 
+                        onClick={() => navigate('/dashboard')}
+                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
+                    >
+                        Back to Dashboard
+                    </button>
                 </div>
                 
-                {/* Recent Orders */}
+                {/* Filter Buttons */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                    <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'all' 
+                                ? 'bg-yellow-500 text-white' 
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}
+                    >
+                        All Orders
+                    </button>
+                    <button
+                        onClick={() => setFilter('completed')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'completed' 
+                                ? 'bg-green-500 text-white' 
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}
+                    >
+                        Completed
+                    </button>
+                    <button
+                        onClick={() => setFilter('pending')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'pending' 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}
+                    >
+                        Pending
+                    </button>
+                    <button
+                        onClick={() => setFilter('cancelled')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'cancelled' 
+                                ? 'bg-red-500 text-white' 
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}
+                    >
+                        Cancelled
+                    </button>
+                </div>
+                
+                {/* Orders Table */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="flex justify-between items-center p-6 border-b">
-                        <h2 className="text-xl font-semibold">Recent Orders</h2>
-                        <Link 
-                            to="/all-orders" 
-                            className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
-                        >
-                            View All Orders
-                        </Link>
-                    </div>
-                    
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
@@ -345,10 +346,10 @@ function CustomerDashboard() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {orders.slice(0, 5).map((order) => (
+                                {filteredOrders.map((order, index) => (
                                     <tr 
-                                        key={order.payment_id} 
-                                        className="hover:bg-gray-50 cursor-pointer" 
+                                        key={index} 
+                                        className="hover:bg-gray-50 cursor-pointer"
                                         onClick={() => handleOrderClick(order)}
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -374,10 +375,10 @@ function CustomerDashboard() {
                                     </tr>
                                 ))}
                                 
-                                {orders.length === 0 && (
+                                {filteredOrders.length === 0 && (
                                     <tr>
                                         <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                                            No orders found. Book a service to get started!
+                                            No orders found with the selected filter.
                                         </td>
                                     </tr>
                                 )}
@@ -515,4 +516,4 @@ function CustomerDashboard() {
     );
 }
 
-export default CustomerDashboard;
+export default AllOrders;

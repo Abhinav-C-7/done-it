@@ -477,4 +477,283 @@ router.post('/reject-job/:requestId', verifyToken, async (req, res) => {
     }
 });
 
+// Get serviceman's accepted jobs
+router.get('/my-jobs', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (req.user.type !== 'serviceman') {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const servicemanId = req.user.id;
+
+        // Get all jobs assigned to this serviceman
+        const myJobs = await pool.query(
+            `SELECT 
+                sr.request_id, 
+                sr.service_type, 
+                sr.description, 
+                sr.address as location_address,
+                sr.latitude as location_lat,
+                sr.longitude as location_lng, 
+                sr.status,
+                sr.amount as price,
+                sr.created_at,
+                sr.updated_at,
+                sr.job_status,
+                c.full_name as customer_name,
+                c.phone_number as customer_phone
+            FROM service_requests sr
+            JOIN customers c ON sr.customer_id = c.user_id
+            WHERE sr.assigned_serviceman = $1 AND sr.status = 'accepted'
+            ORDER BY sr.created_at DESC`,
+            [servicemanId]
+        );
+
+        res.json(myJobs.rows);
+    } catch (err) {
+        console.error('Error fetching serviceman jobs:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Get a specific job details
+router.get('/job/:requestId', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (req.user.type !== 'serviceman') {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const servicemanId = req.user.id;
+        const requestId = req.params.requestId;
+
+        // Get job details
+        const jobDetails = await pool.query(
+            `SELECT 
+                sr.request_id, 
+                sr.service_type, 
+                sr.description, 
+                sr.address as location_address,
+                sr.latitude as location_lat,
+                sr.longitude as location_lng, 
+                sr.status,
+                sr.amount as price,
+                sr.created_at,
+                sr.updated_at,
+                sr.job_status,
+                c.full_name as customer_name,
+                c.phone_number as customer_phone,
+                c.email as customer_email
+            FROM service_requests sr
+            JOIN customers c ON sr.customer_id = c.user_id
+            WHERE sr.request_id = $1 AND sr.assigned_serviceman = $2`,
+            [requestId, servicemanId]
+        );
+
+        if (jobDetails.rows.length === 0) {
+            return res.status(404).json({ message: 'Job not found or not assigned to you' });
+        }
+
+        res.json(jobDetails.rows[0]);
+    } catch (err) {
+        console.error('Error fetching job details:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Update job status
+router.put('/job/:requestId/status', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (req.user.type !== 'serviceman') {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const servicemanId = req.user.id;
+        const requestId = req.params.requestId;
+        const { jobStatus } = req.body;
+
+        // Validate job status
+        const validStatuses = ['pending', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+        if (!validStatuses.includes(jobStatus)) {
+            return res.status(400).json({ message: 'Invalid job status' });
+        }
+
+        // Begin transaction
+        await pool.query('BEGIN');
+
+        try {
+            // Check if the job belongs to this serviceman
+            const jobCheck = await pool.query(
+                'SELECT customer_id FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
+                [requestId, servicemanId]
+            );
+
+            if (jobCheck.rows.length === 0) {
+                await pool.query('ROLLBACK');
+                return res.status(404).json({ message: 'Job not found or not assigned to you' });
+            }
+
+            const customerId = jobCheck.rows[0].customer_id;
+
+            // Update job status
+            await pool.query(
+                'UPDATE service_requests SET job_status = $1, updated_at = NOW() WHERE request_id = $2',
+                [jobStatus, requestId]
+            );
+
+            // Get serviceman details for notification
+            const servicemanDetails = await pool.query(
+                'SELECT full_name FROM serviceman_profiles WHERE serviceman_id = $1',
+                [servicemanId]
+            );
+
+            if (servicemanDetails.rows.length === 0) {
+                throw new Error('Serviceman profile not found');
+            }
+
+            const serviceman = servicemanDetails.rows[0];
+
+            // Create notification for the customer based on status
+            let title = 'Job Status Update';
+            let message = '';
+
+            switch (jobStatus) {
+                case 'on_the_way':
+                    message = `${serviceman.full_name} is on the way to your location.`;
+                    break;
+                case 'arrived':
+                    message = `${serviceman.full_name} has arrived at your location.`;
+                    break;
+                case 'in_progress':
+                    message = `${serviceman.full_name} has started working on your service request.`;
+                    break;
+                case 'completed':
+                    message = `${serviceman.full_name} has completed your service request.`;
+                    break;
+                default:
+                    message = `${serviceman.full_name} has updated the status of your service request.`;
+            }
+
+            await pool.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    customerId, 
+                    'customer', 
+                    title, 
+                    message,
+                    'status_update',
+                    requestId,
+                    false
+                ]
+            );
+
+            // Commit transaction
+            await pool.query('COMMIT');
+
+            res.json({ message: 'Job status updated successfully', jobStatus });
+        } catch (err) {
+            // Rollback transaction in case of error
+            await pool.query('ROLLBACK');
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error updating job status:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Update job price
+router.put('/job/:requestId/price', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (req.user.type !== 'serviceman') {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const servicemanId = req.user.id;
+        const requestId = req.params.requestId;
+        const { price } = req.body;
+
+        // Validate price
+        if (!price || isNaN(price) || price <= 0) {
+            return res.status(400).json({ message: 'Invalid price. Please provide a positive number.' });
+        }
+
+        // Begin transaction
+        await pool.query('BEGIN');
+
+        try {
+            // Check if the job belongs to this serviceman
+            const jobCheck = await pool.query(
+                'SELECT customer_id, job_status FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
+                [requestId, servicemanId]
+            );
+
+            if (jobCheck.rows.length === 0) {
+                await pool.query('ROLLBACK');
+                return res.status(404).json({ message: 'Job not found or not assigned to you' });
+            }
+
+            const customerId = jobCheck.rows[0].customer_id;
+            const jobStatus = jobCheck.rows[0].job_status;
+
+            // Only allow price update if job is completed
+            if (jobStatus !== 'completed') {
+                await pool.query('ROLLBACK');
+                return res.status(400).json({ message: 'Can only set price after job is completed' });
+            }
+
+            // Update job price
+            await pool.query(
+                'UPDATE service_requests SET amount = $1, updated_at = NOW() WHERE request_id = $2',
+                [price, requestId]
+            );
+
+            // Get serviceman details for notification
+            const servicemanDetails = await pool.query(
+                'SELECT full_name FROM serviceman_profiles WHERE serviceman_id = $1',
+                [servicemanId]
+            );
+
+            if (servicemanDetails.rows.length === 0) {
+                throw new Error('Serviceman profile not found');
+            }
+
+            const serviceman = servicemanDetails.rows[0];
+
+            // Create notification for the customer
+            await pool.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    customerId, 
+                    'customer', 
+                    'Price Updated', 
+                    `${serviceman.full_name} has set the price for your service request: ₹${price}`,
+                    'price_update',
+                    requestId,
+                    false
+                ]
+            );
+
+            // Commit transaction
+            await pool.query('COMMIT');
+
+            res.json({ message: 'Job price updated successfully', price });
+        } catch (err) {
+            // Rollback transaction in case of error
+            await pool.query('ROLLBACK');
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error updating job price:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;

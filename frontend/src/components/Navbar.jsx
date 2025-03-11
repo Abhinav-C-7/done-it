@@ -2,8 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
 import profileIcon from '../assets/images/profile.png';
-import postIcon from '../assets/images/post.png';
-import homeIcon from '../assets/images/home.png';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -23,12 +21,6 @@ const Navbar = () => {
                     <div className="flex items-center space-x-6">
                         {user ? (
                             <>
-                                <Link to="/post" className="text-gray-600 hover:text-gray-900">
-                                    <img src={postIcon} alt="Post" className="h-6 w-6" />
-                                </Link>
-                                <Link to="/" className="text-gray-600 hover:text-gray-900">
-                                    <img src={homeIcon} alt="Home" className="h-6 w-6" />
-                                </Link>
                                 <Link to="/profile" className="text-gray-600 hover:text-gray-900">
                                     <img src={profileIcon} alt="Profile" className="h-6 w-6" />
                                 </Link>
