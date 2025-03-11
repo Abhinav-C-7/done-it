@@ -6,6 +6,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LogoutConfirmation from './components/LogoutConfirmation';
+import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -73,6 +74,7 @@ function App() {
         <CartProvider>
           <NotificationProvider>
             <div className="app">
+              <ScrollToTop />
               <Navbar />
               <LogoutConfirmation />
               <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}

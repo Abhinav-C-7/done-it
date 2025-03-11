@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from "../components/Navbar";
+import post from "../assets/images/post.png";
+import homefull from "../assets/images/home-full.png";
+import profile from "../assets/images/profile.png";
 
 function Register() {
     const [formData, setFormData] = useState({
@@ -56,6 +60,7 @@ function Register() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-yellow-100 py-12 px-4 sm:px-6 lg:px-8">
+            <Navbar posticon={post} homeicon={homefull} profileicon={profile} hideAuthButtons={true} />
             <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div className="px-8 pt-8 pb-6">
                     <div className="text-center mb-8">

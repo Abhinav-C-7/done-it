@@ -127,7 +127,7 @@ function Login() {
                     </div>
                 </div>
             </div>
-            <Navbar posticon={post} homeicon={homefull} profileicon={profile} />
+            <Navbar posticon={post} homeicon={homefull} profileicon={profile} hideAuthButtons={true} />
         </div>
     );
 }

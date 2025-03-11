@@ -21,6 +21,9 @@ function Profile() {
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePicture, setProfilePicture] = useState(defaultProfilePic);
+  const [tempProfilePicture, setTempProfilePicture] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -53,6 +56,11 @@ function Profile() {
             phone: profileResponse.data.phone_number || '',
             address: profileResponse.data.address || ''
           });
+          
+          // Set profile picture if available from the backend
+          if (profileResponse.data.profile_picture) {
+            setProfilePicture(profileResponse.data.profile_picture);
+          }
         }
 
         // Fetch saved locations (if API exists)
@@ -142,7 +150,8 @@ function Profile() {
       await axios.put(`${API_BASE_URL}/auth/update-profile`, {
         full_name: profileData.fullName,
         phone_number: profileData.phone,
-        address: profileData.address
+        address: profileData.address,
+        profile_picture: profilePicture !== defaultProfilePic ? profilePicture : null
       }, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -163,11 +172,74 @@ function Profile() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProfilePicture(reader.result);
+        const base64Image = reader.result;
+        // Store the image temporarily and show confirmation dialog
+        setTempProfilePicture(base64Image);
+        setShowConfirmation(true);
       };
       reader.readAsDataURL(file);
     }
   };
+  
+  const confirmProfilePictureChange = () => {
+    // Apply the temporary profile picture
+    setProfilePicture(tempProfilePicture);
+    
+    // Save the profile picture to local storage to persist it temporarily
+    localStorage.setItem('profilePicture', tempProfilePicture);
+    
+    // Update the profile picture on the server
+    updateProfilePicture(tempProfilePicture);
+    
+    // Close the confirmation dialog
+    setShowConfirmation(false);
+    setTempProfilePicture(null);
+  };
+  
+  const cancelProfilePictureChange = () => {
+    // Clear the temporary profile picture and close the confirmation dialog
+    setTempProfilePicture(null);
+    setShowConfirmation(false);
+  };
+  
+  // Function to update profile picture on the server
+  const updateProfilePicture = async (pictureData) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        return;
+      }
+      
+      await axios.put(`${API_BASE_URL}/auth/update-profile`, {
+        profile_picture: pictureData
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Show success message
+      setSuccessMessage('Profile picture updated successfully');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
+      
+      console.log('Profile picture updated successfully');
+    } catch (err) {
+      console.error('Error updating profile picture:', err);
+    }
+  };
+
+  // Load profile picture from local storage on component mount
+  useEffect(() => {
+    const savedProfilePicture = localStorage.getItem('profilePicture');
+    if (savedProfilePicture) {
+      setProfilePicture(savedProfilePicture);
+    }
+  }, []);
 
   // Function to render stars for ratings
   const renderStars = (rating) => {
@@ -230,6 +302,43 @@ function Profile() {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               {error}
+            </div>
+          )}
+          
+          {successMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+              {successMessage}
+            </div>
+          )}
+          
+          {/* Profile Picture Confirmation Dialog */}
+          {showConfirmation && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                <h2 className="text-xl font-semibold mb-4">Update Profile Picture</h2>
+                <div className="flex justify-center mb-4">
+                  <img 
+                    src={tempProfilePicture} 
+                    alt="New Profile" 
+                    className="w-32 h-32 rounded-full object-cover border-4 border-yellow-500"
+                  />
+                </div>
+                <p className="text-gray-700 mb-4">Are you sure you want to update your profile picture?</p>
+                <div className="flex justify-end space-x-2">
+                  <button 
+                    onClick={cancelProfilePictureChange}
+                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={confirmProfilePictureChange}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           
