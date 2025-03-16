@@ -7,9 +7,9 @@ import Layout from '../components/Layout';
 const SUB_SERVICES = {
     'ac': [
         { id: 1, title: 'AC Installation', price: 1499, description: 'Professional AC installation service' },
-        { id: 2, title: 'AC Repair', price: 799, description: 'Expert AC repair and troubleshooting' },
+        { id: 2, title: 'AC Repair', price: 799, description: 'Expert AC repair and troubleshooting', variablePrice: true },
         { id: 3, title: 'AC Maintenance', price: 599, description: 'Regular AC maintenance and cleaning' },
-        { id: 4, title: 'Gas Refill', price: 1299, description: 'AC gas refill and leak detection' }
+        { id: 4, title: 'Gas Refill', price: 1299, description: 'AC gas refill and leak detection', variablePrice: true }
     ],
     'plumbing': [
         { id: 5, title: 'Pipe Repair', price: 499, description: 'Fix leaking pipes and plumbing issues' },
@@ -89,7 +89,8 @@ function ServiceDetails() {
                 id: service.id,
                 type: service.title,
                 price: parseFloat(service.price),
-                description: service.description
+                description: service.description,
+                variablePrice: service.variablePrice || false
             });
         });
 
@@ -105,7 +106,8 @@ function ServiceDetails() {
                     id: service.id,
                     type: service.title,
                     price: parseFloat(service.price),
-                    description: service.description
+                    description: service.description,
+                    variablePrice: service.variablePrice || false
                 })),
                 total: total,
                 bookingFee: bookingFee,
@@ -137,7 +139,11 @@ function ServiceDetails() {
                                 >
                                     <div className="flex justify-between items-start mb-2">
                                         <h3 className="text-lg font-medium">{service.title}</h3>
-                                        <span className="text-yellow-600 font-semibold">₹{service.price}</span>
+                                        <span className="text-yellow-600 font-semibold">
+                                            {service.variablePrice 
+                                                ? `Starting from ₹${service.price}` 
+                                                : `₹${service.price}`}
+                                        </span>
                                     </div>
                                     <p className="text-gray-600 text-sm">{service.description}</p>
                                 </div>

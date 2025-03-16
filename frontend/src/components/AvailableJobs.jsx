@@ -13,6 +13,9 @@ const AvailableJobs = () => {
   const [location, setLocation] = useState({ latitude: '', longitude: '' });
   const [servicemanLocation, setServicemanLocation] = useState(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Fetch available jobs
   const fetchAvailableJobs = async () => {
@@ -131,10 +134,17 @@ const AvailableJobs = () => {
     }));
   };
 
+  // Function to show confirmation modal
+  const handleAcceptClick = (requestId) => {
+    setSelectedJobId(requestId);
+    setShowConfirmModal(true);
+  };
+
   // Accept a job
   const acceptJob = async (requestId) => {
     try {
       setLoading(true);
+      setShowConfirmModal(false);
       
       const response = await axios.post(`${API_BASE_URL}/serviceman/accept-job/${requestId}`, {}, {
         headers: {
@@ -146,6 +156,13 @@ const AvailableJobs = () => {
       
       // Remove the accepted job from the list
       setJobs(prevJobs => prevJobs.filter(job => job.request_id !== requestId));
+      
+      // Show success message
+      setSuccessMessage('Job accepted successfully! You can view it in "My Jobs" section.');
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+      
       setLoading(false);
     } catch (err) {
       console.error('Error accepting job:', err);
@@ -277,6 +294,12 @@ const AvailableJobs = () => {
         </div>
       )}
       
+      {successMessage && (
+        <div className="alert alert-success shadow-sm">
+          {successMessage}
+        </div>
+      )}
+      
       {jobs.length === 0 ? (
         <div className="alert alert-info shadow-sm">
           No available jobs at the moment. Check back later!
@@ -293,7 +316,13 @@ const AvailableJobs = () => {
                   </div>
                   <div className="card-body">
                     <div className="d-flex justify-content-between mb-4">
-                      <span className="badge bg-success fs-6 rounded-pill px-3 py-2 shadow-sm">₹{job.price}</span>
+                      <span className="badge bg-success fs-6 rounded-pill px-3 py-2 shadow-sm">
+                        {job.service_name && 
+                         (job.service_name.toLowerCase().includes('ac repair') || 
+                          job.service_name.toLowerCase().includes('gas refill')) 
+                          ? `Starting from ₹${job.price}` 
+                          : `₹${job.price}`}
+                      </span>
                       <span className="badge bg-secondary fs-6 rounded-pill px-3 py-2 shadow-sm">
                         {format(new Date(job.scheduled_date), 'PP')} • {job.time_slot}
                       </span>
@@ -332,7 +361,7 @@ const AvailableJobs = () => {
                   <div className="card-footer bg-white py-3 d-flex justify-content-between">
                     <button
                       className="btn btn-warning btn-lg px-4 shadow-sm"
-                      onClick={() => acceptJob(job.request_id)}
+                      onClick={() => handleAcceptClick(job.request_id)}
                     >
                       Accept Job
                     </button>
@@ -348,6 +377,43 @@ const AvailableJobs = () => {
             ))}
           </div>
         </>
+      )}
+      
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning">
+                <h5 className="modal-title fw-bold">Confirm Job Acceptance</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowConfirmModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-0">Are you sure you want to accept this job? Once accepted, you will be responsible for completing this service.</p>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowConfirmModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-warning" 
+                  onClick={() => acceptJob(selectedJobId)}
+                >
+                  Accept Job
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

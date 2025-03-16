@@ -166,6 +166,21 @@ const Checkout = () => {
             // Create a service request for each item in the cart
             console.log('User data:', user);
             
+            // Check if user exists and has the necessary ID
+            if (!user) {
+                throw new Error('User not authenticated. Please log in again.');
+            }
+            
+            // Determine the correct customer ID based on the user object structure
+            // For customers, the ID is directly in user.id
+            const customerId = user.id;
+            
+            if (!customerId) {
+                throw new Error('Customer ID not found. Please log in again.');
+            }
+            
+            console.log('Using customer ID:', customerId);
+            
             const orderPromises = cartItems.map(async (item) => {
                 // Parse and clean amount, add booking fee divided by number of items
                 const bookingFeePerItem = bookingFee / cartItems.length;
@@ -173,8 +188,13 @@ const Checkout = () => {
                 const itemPrice = parseFloat(item.price);
                 const cleanAmount = itemPrice + bookingFeePerItem + serviceFeePerItem;
                 
+                // Ensure all required fields are properly formatted
+                if (!formData.address || !formData.city || !formData.pincode || !formData.date || !formData.timeSlot) {
+                    throw new Error('Please fill in all required fields');
+                }
+                
                 const requestData = {
-                    customer_id: user.id, // Changed from user.user_id to user.id
+                    customer_id: customerId, // Use the determined customer ID
                     service_type: item.type,
                     description: `Service requested for ${item.type}. Includes booking fee: ₹${bookingFeePerItem.toFixed(2)}, service fee: ₹${serviceFeePerItem.toFixed(2)}`,
                     latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -220,8 +240,15 @@ const Checkout = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
+        // Comprehensive validation of all required fields
         if (!formData.address || !formData.city || !formData.pincode || !formData.timeSlot || !formData.date) {
             alert('Please fill in all required fields');
+            return;
+        }
+
+        // Validate pincode format (6 digits)
+        if (!formData.pincode || !/^\d{6}$/.test(formData.pincode)) {
+            alert('Please enter a valid 6-digit PIN code');
             return;
         }
 
@@ -258,63 +285,30 @@ const Checkout = () => {
             const order = await response.json();
             console.log('Payment order created:', order);
 
-            // Create dummy Razorpay handler for demo
-            const demoRazorpayHandler = {
-                open: async function() {
-                    try {
-                        // Simulate payment success
-                        const demoResponse = {
-                            razorpay_order_id: order.id,
-                            razorpay_payment_id: 'pay_demo_' + Date.now(),
-                        };
-
-                        console.log('Demo payment successful:', demoResponse);
-                        
-                        // Verify payment
-                        const verification = await fetch('http://localhost:3000/api/services/verify-payment', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            },
-                            body: JSON.stringify(demoResponse)
-                        });
-
-                        if (!verification.ok) {
-                            const errorData = await verification.json();
-                            throw new Error(errorData.message || 'Payment verification failed');
-                        }
-
-                        console.log('Demo payment verified, creating service requests...');
-                        // Create service requests after successful payment
-                        const orderResponses = await createServiceRequests(demoResponse.razorpay_payment_id);
-                        console.log('Service requests created:', orderResponses);
-
-                        // Navigate to confirmation page
-                        const orderDetails = {
-                            request_id: orderResponses[0].request_id,
-                            services: cartItems,
-                            total: totalAmount,
-                            scheduled_date: new Date(formData.date).toISOString().split('T')[0],
-                            time_slot: formData.timeSlot,
-                            address: formData.address,
-                            landmark: formData.landmark || '',
-                            city: formData.city,
-                            pincode: formData.pincode,
-                            payment_method: 'demo',
-                            payment_id: demoResponse.razorpay_payment_id
-                        };
-
-                        navigate('/order-confirmation', { state: { orderDetails } });
-                    } catch (error) {
-                        console.error('Error in demo payment:', error);
-                        alert(error.message || 'Error processing your demo payment');
-                    }
-                }
+            // Prepare order details for payment page
+            const orderDetails = {
+                services: cartItems,
+                total: totalAmount,
+                scheduled_date: new Date(formData.date).toISOString().split('T')[0],
+                time_slot: formData.timeSlot,
+                address: formData.address,
+                landmark: formData.landmark || '',
+                city: formData.city,
+                pincode: formData.pincode,
+                payment_method: 'demo'
             };
 
-            // Use demo payment handler
-            demoRazorpayHandler.open();
+            // Navigate to payment page with payment details
+            navigate('/payment', { 
+                state: { 
+                    paymentDetails: {
+                        orderId: order.id,
+                        bookingFee: bookingFee,
+                        orderDetails: orderDetails,
+                        formData: formData
+                    } 
+                } 
+            });
         } catch (error) {
             console.error('Error placing order:', error);
             alert(error.message || 'Failed to place order. Please try again.');
@@ -844,31 +838,37 @@ const Checkout = () => {
                             </div>
                             <div className="space-y-4">
                                 {cartItems.map((item, index) => (
-                                    <div key={index} className="flex justify-between items-start py-3 border-b border-gray-100">
-                                        <div>
+                                    <div key={index} className="flex flex-col py-3 border-b border-gray-100">
+                                        <div className="flex justify-between items-start mb-2">
                                             <h3 className="font-medium text-gray-800">{item.type}</h3>
-                                            <p className="text-sm text-gray-500">{item.time}</p>
+                                            <span className="font-medium text-gray-800">
+                                                {item.variablePrice ? `Starting from ₹${item.price}` : `₹${item.price}`}
+                                            </span>
                                         </div>
-                                        <span className="font-medium text-gray-800">₹{item.price}</span>
+                                        {item.time && <p className="text-sm text-gray-500 mb-2">{item.time}</p>}
+                                        
+                                        {item.variablePrice && (
+                                            <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <p className="text-gray-800 font-medium mb-2 text-sm">Price Breakdown:</p>
+                                                <div className="flex justify-between mb-2 text-sm">
+                                                    <span>Base Service Charge</span>
+                                                    <span className="font-medium">₹{item.price}</span>
+                                                </div>
+                                                <div className="flex justify-between mb-2 text-sm text-amber-700">
+                                                    <span>Additional Charges*</span>
+                                                    <span>To be determined</span>
+                                                </div>
+                                                <p className="text-gray-600 italic mt-2 text-xs">
+                                                    *Final price may vary based on service complexity. Additional charges will be updated by the serviceman after inspection.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                                 <div className="pt-2">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-gray-600">Subtotal</span>
-                                        <span className="font-medium text-gray-800">₹{total}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-gray-600">Service Fee</span>
-                                        <span className="font-medium text-gray-800">₹{serviceFee}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-gray-600">Booking Fee</span>
-                                        <span className="font-medium text-gray-800">₹{bookingFee}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-gray-100 font-medium">
-                                        <span>Total</span>
-                                        <span>₹{totalAmount}</span>
-                                    </div>
+                                    <p className="text-sm text-gray-600 mt-2">
+                                        A booking fee of ₹{bookingFee} will be charged to confirm your service request.
+                                    </p>
                                 </div>
                             </div>
                         </div>

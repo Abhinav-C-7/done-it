@@ -48,14 +48,57 @@ function CustomerDashboard() {
                 }
 
                 const data = await response.json();
-                setOrders(data);
+                
+                // Transform the data to match the expected structure
+                // Group by payment_id to create the services array
+                const groupedOrders = {};
+                
+                if (Array.isArray(data)) {
+                    data.forEach(order => {
+                        const paymentId = order.payment_id;
+                        
+                        if (!groupedOrders[paymentId]) {
+                            groupedOrders[paymentId] = {
+                                payment_id: paymentId,
+                                created_at: order.created_at,
+                                total_amount: 0,
+                                address: order.address,
+                                city: order.city,
+                                scheduled_date: order.scheduled_date,
+                                time_slot: order.time_slot,
+                                services: []
+                            };
+                        }
+                        
+                        // Add this service to the order
+                        groupedOrders[paymentId].services.push({
+                            request_id: order.request_id,
+                            service_type: order.service_type,
+                            status: order.status,
+                            job_status: order.job_status || 'pending',
+                            serviceman_id: order.serviceman_id,
+                            serviceman_name: order.serviceman_name,
+                            serviceman_phone: order.serviceman_phone,
+                            amount: order.amount
+                        });
+                        
+                        // Add to total amount
+                        groupedOrders[paymentId].total_amount += parseFloat(order.amount || 0);
+                    });
+                }
+                
+                // Convert to array
+                const transformedOrders = Object.values(groupedOrders);
+                console.log('Transformed orders:', transformedOrders.length);
+                
+                setOrders(transformedOrders);
                 
                 // Calculate stats
                 let completed = 0;
                 let pending = 0;
                 let cancelled = 0;
                 
-                data.forEach(order => {
+                transformedOrders.forEach(order => {
                     order.services.forEach(service => {
                         if (service.status === 'completed') {
                             completed++;
@@ -68,7 +111,7 @@ function CustomerDashboard() {
                 });
                 
                 setStats({
-                    total: data.length,
+                    total: transformedOrders.length,
                     completed,
                     pending,
                     cancelled
@@ -238,6 +281,10 @@ function CustomerDashboard() {
         // If status is not found, default to pending (index 0)
         const progressIndex = currentIndex === -1 ? 0 : currentIndex;
         
+        // Determine progress bar color based on status
+        const progressBarColor = mappedStatus === 'completed' ? 'bg-green-500' : 'bg-yellow-500';
+        const dotColor = mappedStatus === 'completed' ? 'bg-green-500' : 'bg-yellow-500';
+        
         return (
             <div className="w-full mt-4">
                 <div className="flex justify-between mb-2">
@@ -249,7 +296,7 @@ function CustomerDashboard() {
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full">
                     <div 
-                        className="h-full bg-yellow-500 rounded-full" 
+                        className={`h-full ${progressBarColor} rounded-full`}
                         style={{ width: `${(progressIndex + 1) * 16.66}%` }}
                     ></div>
                 </div>
@@ -257,7 +304,7 @@ function CustomerDashboard() {
                     {statuses.map((s, index) => (
                         <div 
                             key={s} 
-                            className={`w-4 h-4 rounded-full ${index <= progressIndex ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                            className={`w-4 h-4 rounded-full ${index <= progressIndex ? dotColor : 'bg-gray-300'}`}
                             style={{ marginLeft: index === 0 ? '0' : 'auto', marginRight: index === statuses.length - 1 ? '0' : 'auto' }}
                         ></div>
                     ))}

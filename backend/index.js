@@ -12,6 +12,9 @@ const io = require('socket.io')(http, {
 const pool = require('./config/db');
 const path = require('path');
 
+// Make io available to routes
+app.set('io', io);
+
 // Routes
 const authRoute = require('./routes/auth');
 const servicesRoute = require('./routes/services');
@@ -42,6 +45,15 @@ app.use('/api/notifications', notificationsRoutes);
 // Socket.io connection handling
 io.on('connection', (socket) => {
     console.log('A user connected');
+
+    // Join user-specific room for targeted updates
+    socket.on('joinRoom', ({ userId, userType }) => {
+        if (userId && userType) {
+            const roomName = `${userType}_${userId}`;
+            socket.join(roomName);
+            console.log(`User joined room: ${roomName}`);
+        }
+    });
 
     // Handle location updates from workers
     socket.on('updateLocation', async (data) => {

@@ -599,7 +599,7 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
 
             // Update job status
             await pool.query(
-                'UPDATE service_requests SET job_status = $1, updated_at = NOW() WHERE request_id = $2',
+                'UPDATE service_requests SET status = $1, updated_at = NOW() WHERE request_id = $2',
                 [jobStatus, requestId]
             );
 
@@ -650,6 +650,14 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
                     false
                 ]
             );
+
+            // Emit socket event for real-time updates
+            req.app.get('io').to(`customer_${customerId}`).emit('jobStatusUpdate', {
+                requestId,
+                jobStatus,
+                message,
+                servicemanName: serviceman.full_name
+            });
 
             // Commit transaction
             await pool.query('COMMIT');

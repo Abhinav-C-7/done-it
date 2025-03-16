@@ -32,8 +32,8 @@ const OrderConfirmation = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h1 className="text-2xl font-bold text-gray-800">Order Confirmed!</h1>
-                        <p className="text-gray-600 mt-2">Your service request has been successfully placed.</p>
+                        <h1 className="text-2xl font-bold text-gray-800">Request Placed!</h1>
+                        <p className="text-gray-600 mt-2">Your service request has been received. A professional will review and confirm your booking shortly.</p>
                         <p className="text-lg font-semibold text-yellow-600 mt-2">Order ID: #{orderDetails.request_id}</p>
                     </div>
 
