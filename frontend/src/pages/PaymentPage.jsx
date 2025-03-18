@@ -1,27 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:3000/api'; // Updated to local backend URL
 
 const PaymentPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [serviceDetails, setServiceDetails] = useState(null);
+    const [jobDetails, setJobDetails] = useState(null);
+    const [paymentType, setPaymentType] = useState(null);
+    const [serviceId, setServiceId] = useState(null);
+    const [requestId, setRequestId] = useState(null);
+    const [paymentRequestId, setPaymentRequestId] = useState(null);
+    const [bookingFee, setBookingFee] = useState(49);
+    const [totalAmount, setTotalAmount] = useState(0);
     
     // Get payment details from location state
     const paymentDetails = location.state?.paymentDetails;
-    const bookingFee = paymentDetails?.bookingFee || 49;
     const isServicePayment = paymentDetails?.servicePayment || false;
-    const serviceDetails = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
-    const paymentAmount = isServicePayment ? serviceDetails?.totalAmount : bookingFee;
+    const serviceDetailsFromLocation = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
+    const paymentAmount = isServicePayment ? serviceDetailsFromLocation?.totalAmount : bookingFee;
     
     useEffect(() => {
         // Redirect if no payment details
         if (!paymentDetails) {
             navigate('/checkout');
+            return;
         }
-    }, [paymentDetails, navigate]);
-
+        
+        // Extract payment information from location state
+        if (paymentDetails) {
+            if (paymentDetails.servicePayment) {
+                setPaymentType('service');
+                setRequestId(paymentDetails.requestId);
+                setPaymentRequestId(paymentDetails.paymentRequestId);
+                setTotalAmount(paymentDetails.orderDetails.services[0].totalAmount);
+            } else {
+                setPaymentType('booking');
+                setServiceId(paymentDetails.serviceId);
+                setBookingFee(paymentDetails.bookingFee || 49);
+            }
+        }
+        
+        const fetchJobDetails = async () => {
+            if (!paymentType) return;
+            
+            try {
+                setIsLoading(true);
+                
+                if (paymentType === 'booking' && serviceId) {
+                    // For booking payments, fetch service details if serviceId exists
+                    const response = await axios.get(`${API_BASE_URL}/services/${serviceId}`);
+                    setServiceDetails(response.data);
+                } else if (paymentType === 'service' && requestId) {
+                    // For service payments, fetch job details
+                    const token = localStorage.getItem('token');
+                    const response = await axios.get(
+                        `${API_BASE_URL}/services/request/${requestId}`,
+                        { headers: { 'Authorization': `Bearer ${token}` } }
+                    );
+                    setJobDetails(response.data);
+                }
+                
+                setIsLoading(false);
+            } catch (error) {
+                console.error('Error fetching details:', error);
+                setError('Failed to load service details. Please try again.');
+                setIsLoading(false);
+            }
+        };
+        
+        fetchJobDetails();
+    }, [paymentDetails, navigate, serviceId, paymentType, requestId]);
+    
     const handlePayment = async () => {
         setIsProcessing(true);
         
@@ -40,34 +97,94 @@ const PaymentPage = () => {
                     razorpay_payment_id: 'pay_demo_' + Date.now(),
                 };
                 
-                if (isServicePayment) {
-                    // For service payments, redirect back to transactions page
-                    navigate('/transactions', { 
-                        state: { 
-                            paymentSuccess: true,
-                            paymentDetails: {
-                                ...paymentDetails,
-                                payment_id: demoResponse.razorpay_payment_id
-                            }
-                        } 
-                    });
-                } else {
-                    // For booking fee payments, redirect to order confirmation
-                    navigate('/order-confirmation', { 
-                        state: { 
-                            orderDetails: {
-                                ...paymentDetails.orderDetails,
-                                payment_id: demoResponse.razorpay_payment_id
-                            } 
-                        } 
-                    });
-                }
+                handlePaymentSuccess(demoResponse.razorpay_payment_id);
             }, 2000);
         } catch (error) {
             console.error('Error processing payment:', error);
             setIsProcessing(false);
             alert('Payment failed. Please try again.');
         }
+    };
+    
+    const handlePaymentSuccess = (paymentId) => {
+        setIsLoading(true);
+        
+        // Record payment in database
+        const paymentData = {
+            paymentId,
+            amount: paymentType === 'booking' ? bookingFee : totalAmount,
+            serviceId: paymentType === 'booking' ? serviceId : null,
+            requestId: paymentType === 'service' ? requestId : null,
+            paymentType: paymentType === 'booking' ? 'booking_fee' : 'service_payment',
+            serviceType: paymentType === 'booking' 
+                ? serviceDetails?.title || 'Service Booking'
+                : jobDetails?.service_type || 'Service Payment'
+        };
+        
+        // Make the API call for recording payment
+        axios.post(`${API_BASE_URL}/services/record-payment`, paymentData, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        })
+        .then(() => {
+            // Update payment request status if this is a service payment
+            if (paymentType === 'service' && requestId && paymentRequestId) {
+                axios.put(`${API_BASE_URL}/services/update-payment-request/${paymentRequestId}`, 
+                    { status: 'paid' },
+                    { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+                ).catch(err => console.error('Error updating payment request:', err));
+            }
+        })
+        .catch(error => {
+            console.error('Error recording payment:', error);
+            setError('Payment was successful, but we had trouble recording it. Please contact support.');
+        });
+        
+        setIsLoading(false);
+        setPaymentSuccess(true);
+        
+        // Redirect after a delay
+        setTimeout(() => {
+            // For both booking and service payments, redirect to order-confirmation page
+            navigate('/order-confirmation', { 
+                state: { 
+                    orderDetails: paymentType === 'booking' 
+                        ? {
+                            request_id: `REQ-${Date.now()}`,
+                            services: [{
+                                title: serviceDetails?.title || 'Service Booking',
+                                quantity: 1,
+                                price: bookingFee
+                            }],
+                            total: bookingFee,
+                            scheduled_date: paymentDetails?.formData?.date || new Date().toISOString(),
+                            time_slot: paymentDetails?.formData?.timeSlot || '09:00 AM - 11:00 AM',
+                            address: paymentDetails?.formData?.address || 'Your address',
+                            landmark: paymentDetails?.formData?.landmark || '',
+                            city: paymentDetails?.formData?.city || 'Your city',
+                            pincode: paymentDetails?.formData?.pincode || '000000',
+                            payment_method: 'online',
+                            payment_id: paymentId
+                        }
+                        : {
+                            request_id: requestId || `REQ-${Date.now()}`,
+                            services: [{
+                                title: jobDetails?.service_type || 'Service Payment',
+                                quantity: 1,
+                                price: totalAmount
+                            }],
+                            total: totalAmount,
+                            scheduled_date: jobDetails?.scheduled_date || new Date().toISOString(),
+                            time_slot: jobDetails?.time_slot || '09:00 AM - 11:00 AM',
+                            address: jobDetails?.address || 'Service address',
+                            landmark: jobDetails?.landmark || '',
+                            city: jobDetails?.city || 'Service city',
+                            pincode: jobDetails?.pincode || '000000',
+                            payment_method: 'online',
+                            payment_id: paymentId
+                        }
+                } 
+            });
+        }, 2000);
     };
 
     if (!paymentDetails) {
@@ -95,9 +212,7 @@ const PaymentPage = () => {
                                     : "Your service request has been confirmed."}
                             </p>
                             <p className="text-gray-500 text-sm">
-                                {isServicePayment
-                                    ? "Redirecting to transactions page..."
-                                    : "Redirecting to confirmation page..."}
+                                Redirecting to confirmation page...
                             </p>
                         </div>
                     ) : (
@@ -109,18 +224,18 @@ const PaymentPage = () => {
                                 
                                 {isServicePayment && (
                                     <div className="mb-4 bg-gray-50 p-4 rounded-md">
-                                        <h3 className="font-medium text-gray-700 mb-2">{serviceDetails.type}</h3>
+                                        <h3 className="font-medium text-gray-700 mb-2">{serviceDetailsFromLocation.type}</h3>
                                         <div className="flex justify-between text-sm mb-1">
                                             <span>Base Service Charge</span>
-                                            <span>₹{serviceDetails.price}</span>
+                                            <span>₹{serviceDetailsFromLocation.price}</span>
                                         </div>
                                         <div className="flex justify-between text-sm mb-1">
                                             <span>Additional Charges</span>
-                                            <span>₹{serviceDetails.additionalCharges}</span>
+                                            <span>₹{serviceDetailsFromLocation.additionalCharges}</span>
                                         </div>
                                         <div className="flex justify-between font-medium text-gray-800 pt-2 mt-2 border-t border-gray-200">
                                             <span>Total Amount</span>
-                                            <span>₹{serviceDetails.totalAmount}</span>
+                                            <span>₹{serviceDetailsFromLocation.totalAmount}</span>
                                         </div>
                                     </div>
                                 )}

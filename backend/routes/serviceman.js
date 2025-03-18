@@ -520,42 +520,45 @@ router.get('/my-jobs', verifyToken, async (req, res) => {
 // Get a specific job details
 router.get('/job/:requestId', verifyToken, async (req, res) => {
     try {
+        const { requestId } = req.params;
+        
         // Check if user is a serviceman
         if (req.user.type !== 'serviceman') {
-            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+            return res.status(403).json({ message: 'Access denied' });
         }
-
-        const servicemanId = req.user.id;
-        const requestId = req.params.requestId;
-
-        // Get job details
-        const jobDetails = await pool.query(
+        
+        // Add price_finalized column if it doesn't exist
+        try {
+            await pool.query(`
+                ALTER TABLE service_requests 
+                ADD COLUMN IF NOT EXISTS price_finalized BOOLEAN DEFAULT FALSE
+            `);
+        } catch (alterErr) {
+            console.error('Error adding price_finalized column:', alterErr);
+            // Continue execution even if column already exists
+        }
+        
+        // Get job details - Fixed query with proper join conditions and column names
+        const jobResult = await pool.query(
             `SELECT 
-                sr.request_id, 
-                sr.service_type, 
-                sr.description, 
-                sr.address as location_address,
-                sr.latitude as location_lat,
-                sr.longitude as location_lng, 
-                sr.status,
-                sr.amount as price,
-                sr.created_at,
-                sr.updated_at,
-                sr.job_status,
+                sr.*,
                 c.full_name as customer_name,
-                c.phone_number as customer_phone,
-                c.email as customer_email
+                c.email as customer_email,
+                c.phone_number as customer_phone
             FROM service_requests sr
-            JOIN customers c ON sr.customer_id = c.user_id
+            LEFT JOIN customers c ON sr.customer_id = c.user_id
             WHERE sr.request_id = $1 AND sr.assigned_serviceman = $2`,
-            [requestId, servicemanId]
+            [requestId, req.user.id]
         );
-
-        if (jobDetails.rows.length === 0) {
+        
+        if (jobResult.rows.length === 0) {
             return res.status(404).json({ message: 'Job not found or not assigned to you' });
         }
-
-        res.json(jobDetails.rows[0]);
+        
+        const job = jobResult.rows[0];
+        
+        // Return job details
+        res.json(job);
     } catch (err) {
         console.error('Error fetching job details:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -677,86 +680,153 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
 // Update job price
 router.put('/job/:requestId/price', verifyToken, async (req, res) => {
     try {
+        const { requestId } = req.params;
+        const { price, finalize } = req.body;
+        
+        console.log('Updating job price:', { requestId, price, finalize });
+        
         // Check if user is a serviceman
         if (req.user.type !== 'serviceman') {
             return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
         }
-
+        
         const servicemanId = req.user.id;
-        const requestId = req.params.requestId;
-        const { price } = req.body;
-
+        
         // Validate price
         if (!price || isNaN(price) || price <= 0) {
-            return res.status(400).json({ message: 'Invalid price. Please provide a positive number.' });
+            return res.status(400).json({ message: 'Invalid price. Please provide a valid positive number.' });
         }
-
-        // Begin transaction
-        await pool.query('BEGIN');
-
+        
+        // Get job details to ensure it's assigned to this serviceman
+        const jobDetails = await pool.query(
+            'SELECT * FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
+            [requestId, servicemanId]
+        );
+        
+        if (jobDetails.rows.length === 0) {
+            return res.status(404).json({ message: 'Job not found or not assigned to you.' });
+        }
+        
+        const job = jobDetails.rows[0];
+        
         try {
-            // Check if the job belongs to this serviceman
-            const jobCheck = await pool.query(
-                'SELECT customer_id, job_status FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
-                [requestId, servicemanId]
-            );
-
-            if (jobCheck.rows.length === 0) {
-                await pool.query('ROLLBACK');
-                return res.status(404).json({ message: 'Job not found or not assigned to you' });
+            const tableInfo = await pool.query(`
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'service_requests'
+            `);
+            
+            console.log('Table info:', tableInfo.rows);
+            
+            // Check if price_finalized column exists
+            const priceFinalized = tableInfo.rows.some(col => col.column_name === 'price_finalized');
+            
+            let updateQuery;
+            
+            if (priceFinalized) {
+                updateQuery = `
+                    UPDATE service_requests 
+                    SET price = $1, price_finalized = $2, updated_at = NOW() 
+                    WHERE request_id = $3 AND assigned_serviceman = $4
+                    RETURNING *
+                `;
+            } else {
+                // Add price_finalized column if it doesn't exist
+                try {
+                    await pool.query(`
+                        ALTER TABLE service_requests 
+                        ADD COLUMN IF NOT EXISTS price_finalized BOOLEAN DEFAULT false
+                    `);
+                    
+                    console.log('Added price_finalized column');
+                    
+                    updateQuery = `
+                        UPDATE service_requests 
+                        SET price = $1, price_finalized = $2, updated_at = NOW() 
+                        WHERE request_id = $3 AND assigned_serviceman = $4
+                        RETURNING *
+                    `;
+                } catch (alterErr) {
+                    console.error('Error adding price_finalized column:', alterErr);
+                    
+                    // Fallback to updating just the price
+                    updateQuery = `
+                        UPDATE service_requests 
+                        SET price = $1, updated_at = NOW() 
+                        WHERE request_id = $3 AND assigned_serviceman = $4
+                        RETURNING *
+                    `;
+                }
             }
-
-            const customerId = jobCheck.rows[0].customer_id;
-            const jobStatus = jobCheck.rows[0].job_status;
-
-            // Only allow price update if job is completed
-            if (jobStatus !== 'completed') {
-                await pool.query('ROLLBACK');
-                return res.status(400).json({ message: 'Can only set price after job is completed' });
+            
+            const updateResult = await pool.query(updateQuery, [price, finalize === true, requestId, servicemanId]);
+            
+            console.log('Job price update result:', updateResult.rows[0] ? 'Success' : 'Failed');
+            
+            if (updateResult.rows.length === 0) {
+                return res.status(404).json({ message: 'Job not found or not assigned to you.' });
             }
-
-            // Update job price
-            await pool.query(
-                'UPDATE service_requests SET amount = $1, updated_at = NOW() WHERE request_id = $2',
-                [price, requestId]
-            );
-
-            // Get serviceman details for notification
-            const servicemanDetails = await pool.query(
-                'SELECT full_name FROM serviceman_profiles WHERE serviceman_id = $1',
-                [servicemanId]
-            );
-
-            if (servicemanDetails.rows.length === 0) {
-                throw new Error('Serviceman profile not found');
+            
+            // Create a payment request for the customer
+            if (finalize === true) {
+                try {
+                    // Create payment_requests table if it doesn't exist
+                    await pool.query(`
+                        CREATE TABLE IF NOT EXISTS payment_requests (
+                            id SERIAL PRIMARY KEY,
+                            request_id VARCHAR(255) NOT NULL,
+                            customer_id INTEGER NOT NULL,
+                            serviceman_id INTEGER NOT NULL,
+                            amount DECIMAL(10, 2) NOT NULL,
+                            service_type VARCHAR(255) NOT NULL,
+                            status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                            notes TEXT,
+                            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                            updated_at TIMESTAMP
+                        )
+                    `);
+                    
+                    // Create payment request record
+                    const paymentResult = await pool.query(
+                        `INSERT INTO payment_requests 
+                        (request_id, customer_id, serviceman_id, amount, service_type, status, created_at) 
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW()) 
+                        RETURNING id`,
+                        [requestId, job.customer_id, servicemanId, price, job.service_type, 'pending']
+                    );
+                    
+                    console.log('Payment request created with ID:', paymentResult.rows[0].id);
+                    
+                    // Create notification for the customer
+                    await pool.query(
+                        `INSERT INTO notifications 
+                        (user_id, user_type, title, message, related_id, related_type, created_at, is_read) 
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW(), false)`,
+                        [
+                            job.customer_id, 
+                            'customer', 
+                            'Payment Required', 
+                            `Your ${job.service_type} service has been completed. Please make a payment of ₹${price}.`,
+                            requestId,
+                            'payment_request'
+                        ]
+                    );
+                } catch (paymentErr) {
+                    console.error('Error creating payment request:', paymentErr);
+                    // Continue with success response even if payment request creation fails
+                }
             }
-
-            const serviceman = servicemanDetails.rows[0];
-
-            // Create notification for the customer
-            await pool.query(
-                `INSERT INTO notifications 
-                (user_id, user_type, title, message, type, reference_id, created_at, read) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
-                [
-                    customerId, 
-                    'customer', 
-                    'Price Updated', 
-                    `${serviceman.full_name} has set the price for your service request: ₹${price}`,
-                    'price_update',
-                    requestId,
-                    false
-                ]
-            );
-
-            // Commit transaction
-            await pool.query('COMMIT');
-
-            res.json({ message: 'Job price updated successfully', price });
-        } catch (err) {
-            // Rollback transaction in case of error
-            await pool.query('ROLLBACK');
-            throw err;
+            
+            res.json({ 
+                message: 'Job price updated successfully',
+                job: updateResult.rows[0]
+            });
+        } catch (dbErr) {
+            console.error('Database error:', dbErr);
+            return res.status(500).json({ 
+                message: 'Database error while checking table structure',
+                error: dbErr.message
+            });
         }
     } catch (err) {
         console.error('Error updating job price:', err);

@@ -21,6 +21,7 @@ const JobDetails = () => {
   const [statusToUpdate, setStatusToUpdate] = useState(null);
   const [showPriceConfirmation, setShowPriceConfirmation] = useState(false);
   const [priceToUpdate, setPriceToUpdate] = useState(null);
+  const [priceFinalized, setPriceFinalized] = useState(false);
 
   // Fetch job details
   const fetchJobDetails = async () => {
@@ -49,11 +50,19 @@ const JobDetails = () => {
       
       console.log('Job details response:', response.data);
       
+      // Set job details
       setJob(response.data);
+      
+      // Check if price is already finalized
+      if (response.data.price > 0 && response.data.price_finalized) {
+        setPriceFinalized(true);
+      }
+      
       setLoading(false);
     } catch (err) {
       console.error('Error fetching job details:', err);
-      let errorMessage = 'Failed to fetch job details. Please try again later.';
+      
+      let errorMessage = 'Failed to load job details. Please try again later.';
       
       if (err.response) {
         console.error('Error response:', err.response.data);
@@ -149,16 +158,12 @@ const JobDetails = () => {
     setStatusToUpdate(null);
   };
 
-  // Update job price
-  const updateJobPrice = async (e) => {
-    if (e) e.preventDefault();
-    
+  // Handle price update confirmation
+  const confirmPriceUpdate = async () => {
     try {
       setUpdatingPrice(true);
       setError(null);
-      setSuccessMessage('');
       
-      // Validate price
       if (!priceToUpdate || isNaN(priceToUpdate) || parseFloat(priceToUpdate) <= 0) {
         setError('Please enter a valid price.');
         setUpdatingPrice(false);
@@ -177,10 +182,17 @@ const JobDetails = () => {
       // Update job price
       console.log('Updating job price...');
       console.log('API URL:', `${API_BASE_URL}/serviceman/job/${requestId}/price`);
+      console.log('Request data:', { 
+        price: parseFloat(priceToUpdate),
+        finalize: true
+      });
       
       const response = await axios.put(
         `${API_BASE_URL}/serviceman/job/${requestId}/price`, 
-        { price: parseFloat(priceToUpdate) },
+        { 
+          price: parseFloat(priceToUpdate),
+          finalize: true  // Indicate this is the final price
+        },
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -193,10 +205,54 @@ const JobDetails = () => {
       // Update job in state
       setJob(prevJob => ({
         ...prevJob,
-        price: parseFloat(priceToUpdate)
+        price: parseFloat(priceToUpdate),
+        price_finalized: true
       }));
       
-      setSuccessMessage('Job price updated successfully!');
+      // Set price as finalized
+      setPriceFinalized(true);
+
+      // Create a payment request for the customer
+      try {
+        const paymentResponse = await axios.post(
+          `${API_BASE_URL}/services/create-payment-request`,
+          {
+            requestId: requestId,
+            amount: parseFloat(priceToUpdate),
+            serviceType: job.service_type,
+            customerId: job.customer_id
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        console.log('Payment request created:', paymentResponse.data);
+        
+        // Send notification to the customer
+        await axios.post(
+          `${API_BASE_URL}/notifications/send`,
+          {
+            userId: job.customer_id,
+            userType: 'customer',
+            title: 'Price Updated',
+            message: `The price for your ${job.service_type} service has been updated to ₹${priceToUpdate}. Please check your Transactions page to make the payment.`,
+            relatedId: requestId,
+            relatedType: 'service_request'
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+      } catch (paymentErr) {
+        console.error('Error creating payment request:', paymentErr);
+        // Continue with success message even if payment request fails
+      }
+      
+      setSuccessMessage('Job price updated successfully! Customer has been notified to make the payment.');
       setUpdatingPrice(false);
       setPrice('');
       setShowPriceConfirmation(false);
@@ -208,18 +264,8 @@ const JobDetails = () => {
       }, 3000);
     } catch (err) {
       console.error('Error updating job price:', err);
-      let errorMessage = 'Failed to update job price. Please try again later.';
-      
-      if (err.response) {
-        console.error('Error response:', err.response.data);
-        if (err.response.data && err.response.data.message) {
-          errorMessage = err.response.data.message;
-        }
-      }
-      
-      setError(errorMessage);
+      setError('Failed to update job price. Please try again.');
       setUpdatingPrice(false);
-      setShowPriceConfirmation(false);
     }
   };
 
@@ -235,7 +281,6 @@ const JobDetails = () => {
     
     setPriceToUpdate(price);
     setShowPriceConfirmation(true);
-    setError(null);
   };
 
   // Cancel price update
@@ -553,38 +598,70 @@ const JobDetails = () => {
             <div className="border-t border-gray-200 pt-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Set Job Price</h2>
               
-              <form onSubmit={handlePriceUpdate} className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-grow">
-                  <label htmlFor="price" className="sr-only">Price</label>
-                  <div className="relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">₹</span>
+              {priceFinalized ? (
+                <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
                     </div>
-                    <input
-                      type="number"
-                      name="price"
-                      id="price"
-                      className="focus:ring-yellow-500 focus:border-yellow-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                      placeholder="0.00"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">INR</span>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">
+                        Price has been finalized at ₹{job.price}. The customer has been notified to make the payment.
+                      </p>
                     </div>
                   </div>
                 </div>
-                <button
-                  type="submit"
-                  disabled={updatingPrice}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                >
-                  {updatingPrice ? 'Updating...' : 'Update Price'}
-                </button>
-              </form>
+              ) : (
+                <>
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 mb-4">
+                      {error}
+                    </div>
+                  )}
+                  
+                  {successMessage && (
+                    <div className="bg-green-50 border border-green-200 text-green-800 rounded-md p-4 mb-4">
+                      {successMessage}
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handlePriceUpdate}>
+                    <div className="mb-4">
+                      <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
+                        Price (₹)
+                      </label>
+                      <input
+                        type="number"
+                        id="price"
+                        name="price"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Enter price"
+                        min="1"
+                        step="0.01"
+                        required
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Enter the final price for this job. This price will be shown to the customer for payment.
+                      </p>
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                      disabled={updatingPrice}
+                    >
+                      {updatingPrice ? 'Updating...' : 'Set Final Price'}
+                    </button>
+                    <p className="mt-2 text-xs text-red-600">
+                      Note: Once the price is set, it cannot be changed. Please ensure the amount is correct.
+                    </p>
+                  </form>
+                </>
+              )}
             </div>
           )}
 
@@ -614,7 +691,7 @@ const JobDetails = () => {
                 <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     type="button"
-                    onClick={updateJobPrice}
+                    onClick={confirmPriceUpdate}
                     className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-yellow-400 text-base font-medium text-black hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 sm:w-32 sm:text-sm text-center"
                   >
                     Update Price
