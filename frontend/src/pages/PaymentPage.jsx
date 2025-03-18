@@ -1,84 +1,164 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:3000/api'; // Updated to local backend URL
+import { useAuth } from '../context/AuthContext';
 
 const PaymentPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [serviceDetails, setServiceDetails] = useState(null);
-    const [jobDetails, setJobDetails] = useState(null);
-    const [paymentType, setPaymentType] = useState(null);
-    const [serviceId, setServiceId] = useState(null);
-    const [requestId, setRequestId] = useState(null);
-    const [paymentRequestId, setPaymentRequestId] = useState(null);
-    const [bookingFee, setBookingFee] = useState(49);
-    const [totalAmount, setTotalAmount] = useState(0);
+    const { user } = useAuth();
     
     // Get payment details from location state
     const paymentDetails = location.state?.paymentDetails;
+    const bookingFee = paymentDetails?.bookingFee || 49;
     const isServicePayment = paymentDetails?.servicePayment || false;
-    const serviceDetailsFromLocation = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
-    const paymentAmount = isServicePayment ? serviceDetailsFromLocation?.totalAmount : bookingFee;
+    const serviceDetails = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
+    const paymentAmount = isServicePayment ? serviceDetails?.totalAmount : bookingFee;
     
     useEffect(() => {
         // Redirect if no payment details
         if (!paymentDetails) {
             navigate('/checkout');
-            return;
         }
-        
-        // Extract payment information from location state
-        if (paymentDetails) {
-            if (paymentDetails.servicePayment) {
-                setPaymentType('service');
-                setRequestId(paymentDetails.requestId);
-                setPaymentRequestId(paymentDetails.paymentRequestId);
-                setTotalAmount(paymentDetails.orderDetails.services[0].totalAmount);
-            } else {
-                setPaymentType('booking');
-                setServiceId(paymentDetails.serviceId);
-                setBookingFee(paymentDetails.bookingFee || 49);
+    }, [paymentDetails, navigate]);
+
+    // Function to decode JWT token without external library
+    const decodeJWT = (token) => {
+        try {
+            // JWT tokens are made of three parts: header.payload.signature
+            // We only need the payload part which is the second part
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                console.error('Invalid token format');
+                return null;
             }
-        }
-        
-        const fetchJobDetails = async () => {
-            if (!paymentType) return;
             
-            try {
-                setIsLoading(true);
+            // Base64 decode the payload part
+            const payload = parts[1];
+            // Convert base64url to base64
+            const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+            // Decode base64 to string and parse as JSON
+            const jsonPayload = decodeURIComponent(
+                atob(base64)
+                    .split('')
+                    .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+            );
+            
+            return JSON.parse(jsonPayload);
+        } catch (error) {
+            console.error('Error decoding token:', error);
+            return null;
+        }
+    };
+
+    // Function to get user ID from token
+    const getUserIdFromToken = () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return null;
+            
+            const decoded = decodeJWT(token);
+            console.log('Decoded token:', decoded);
+            
+            // Return the ID from the token
+            return decoded?.id;
+        } catch (error) {
+            console.error('Error getting user ID from token:', error);
+            return null;
+        }
+    };
+
+    // Function to create service requests in the database
+    const createServiceRequests = async (paymentId) => {
+        try {
+            // Get the order details from payment details
+            const orderDetails = paymentDetails.orderDetails;
+            const formData = paymentDetails.formData;
+            
+            // Ensure we have the necessary data
+            if (!orderDetails || !formData) {
+                throw new Error('Missing order details or form data');
+            }
+            
+            // Get customer ID from multiple sources to ensure we have it
+            let customerId = null;
+            
+            // First try to get it from the user object in context
+            if (user && user.id) {
+                customerId = user.id;
+                console.log('Using customer ID from user context:', customerId);
+            } 
+            // Then try to get it from the JWT token
+            else {
+                customerId = getUserIdFromToken();
+                console.log('Using customer ID from JWT token:', customerId);
+            }
+            
+            // If still no customer ID, throw an error
+            if (!customerId) {
+                throw new Error('Could not determine customer ID. Please log in again.');
+            }
+            
+            // Create a service request for each service in the order
+            const orderPromises = orderDetails.services.map(async (item) => {
+                // Parse and clean amount, add booking fee divided by number of items
+                const bookingFeePerItem = bookingFee / orderDetails.services.length;
+                const serviceFeePerItem = 0; // Adjust if you have a service fee
+                const itemPrice = parseFloat(item.price);
+                const cleanAmount = itemPrice + bookingFeePerItem + serviceFeePerItem;
                 
-                if (paymentType === 'booking' && serviceId) {
-                    // For booking payments, fetch service details if serviceId exists
-                    const response = await axios.get(`${API_BASE_URL}/services/${serviceId}`);
-                    setServiceDetails(response.data);
-                } else if (paymentType === 'service' && requestId) {
-                    // For service payments, fetch job details
-                    const token = localStorage.getItem('token');
-                    const response = await axios.get(
-                        `${API_BASE_URL}/services/request/${requestId}`,
-                        { headers: { 'Authorization': `Bearer ${token}` } }
-                    );
-                    setJobDetails(response.data);
+                const requestData = {
+                    customer_id: customerId,
+                    service_type: item.type,
+                    description: `Service requested for ${item.type}. Includes booking fee: ₹${bookingFeePerItem.toFixed(2)}`,
+                    latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+                    longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+                    address: formData.address.trim(),
+                    landmark: (formData.landmark || '').trim(),
+                    city: formData.city.trim(),
+                    pincode: formData.pincode.toString().trim(),
+                    scheduled_date: new Date(formData.date).toISOString().split('T')[0],
+                    time_slot: formData.timeSlot.trim(),
+                    payment_method: 'demo',
+                    payment_id: paymentId,
+                    amount: cleanAmount
+                };
+                
+                console.log('Creating service request with data:', requestData);
+                const response = await fetch('http://localhost:3000/api/services/request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Server error response:', errorData);
+                    throw new Error(errorData.message || 'Failed to create service request');
                 }
                 
-                setIsLoading(false);
-            } catch (error) {
-                console.error('Error fetching details:', error);
-                setError('Failed to load service details. Please try again.');
-                setIsLoading(false);
-            }
-        };
-        
-        fetchJobDetails();
-    }, [paymentDetails, navigate, serviceId, paymentType, requestId]);
-    
+                const responseData = await response.json();
+                console.log('Service request created:', responseData);
+                return responseData;
+            });
+            
+            const createdRequests = await Promise.all(orderPromises);
+            console.log('All service requests created:', createdRequests);
+            
+            // Return the first created request as the main order
+            return createdRequests[0];
+        } catch (error) {
+            console.error('Error creating service requests:', error);
+            throw error;
+        }
+    };
+
     const handlePayment = async () => {
         setIsProcessing(true);
         
@@ -90,101 +170,53 @@ const PaymentPage = () => {
             setPaymentSuccess(true);
             
             // Simulate redirect after showing success message
-            setTimeout(() => {
-                // Create service requests after successful payment
+            setTimeout(async () => {
+                // Create payment response with unique ID
                 const demoResponse = {
                     razorpay_order_id: paymentDetails.orderId,
                     razorpay_payment_id: 'pay_demo_' + Date.now(),
                 };
                 
-                handlePaymentSuccess(demoResponse.razorpay_payment_id);
+                if (isServicePayment) {
+                    // For service payments, redirect back to transactions page
+                    navigate('/transactions', { 
+                        state: { 
+                            paymentSuccess: true,
+                            paymentDetails: {
+                                ...paymentDetails,
+                                payment_id: demoResponse.razorpay_payment_id
+                            }
+                        } 
+                    });
+                } else {
+                    try {
+                        // Create service requests in the database
+                        const createdRequest = await createServiceRequests(demoResponse.razorpay_payment_id);
+                        
+                        // Add the request_id to the order details
+                        const updatedOrderDetails = {
+                            ...paymentDetails.orderDetails,
+                            payment_id: demoResponse.razorpay_payment_id,
+                            request_id: createdRequest.request_id
+                        };
+                        
+                        // For booking fee payments, redirect to order confirmation
+                        navigate('/order-confirmation', { 
+                            state: { 
+                                orderDetails: updatedOrderDetails
+                            } 
+                        });
+                    } catch (error) {
+                        console.error('Failed to create service request:', error);
+                        alert('Payment was successful but we encountered an error creating your service request. Please contact support.');
+                    }
+                }
             }, 2000);
         } catch (error) {
             console.error('Error processing payment:', error);
             setIsProcessing(false);
             alert('Payment failed. Please try again.');
         }
-    };
-    
-    const handlePaymentSuccess = (paymentId) => {
-        setIsLoading(true);
-        
-        // Record payment in database
-        const paymentData = {
-            paymentId,
-            amount: paymentType === 'booking' ? bookingFee : totalAmount,
-            serviceId: paymentType === 'booking' ? serviceId : null,
-            requestId: paymentType === 'service' ? requestId : null,
-            paymentType: paymentType === 'booking' ? 'booking_fee' : 'service_payment',
-            serviceType: paymentType === 'booking' 
-                ? serviceDetails?.title || 'Service Booking'
-                : jobDetails?.service_type || 'Service Payment'
-        };
-        
-        // Make the API call for recording payment
-        axios.post(`${API_BASE_URL}/services/record-payment`, paymentData, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        })
-        .then(() => {
-            // Update payment request status if this is a service payment
-            if (paymentType === 'service' && requestId && paymentRequestId) {
-                axios.put(`${API_BASE_URL}/services/update-payment-request/${paymentRequestId}`, 
-                    { status: 'paid' },
-                    { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
-                ).catch(err => console.error('Error updating payment request:', err));
-            }
-        })
-        .catch(error => {
-            console.error('Error recording payment:', error);
-            setError('Payment was successful, but we had trouble recording it. Please contact support.');
-        });
-        
-        setIsLoading(false);
-        setPaymentSuccess(true);
-        
-        // Redirect after a delay
-        setTimeout(() => {
-            // For both booking and service payments, redirect to order-confirmation page
-            navigate('/order-confirmation', { 
-                state: { 
-                    orderDetails: paymentType === 'booking' 
-                        ? {
-                            request_id: `REQ-${Date.now()}`,
-                            services: [{
-                                title: serviceDetails?.title || 'Service Booking',
-                                quantity: 1,
-                                price: bookingFee
-                            }],
-                            total: bookingFee,
-                            scheduled_date: paymentDetails?.formData?.date || new Date().toISOString(),
-                            time_slot: paymentDetails?.formData?.timeSlot || '09:00 AM - 11:00 AM',
-                            address: paymentDetails?.formData?.address || 'Your address',
-                            landmark: paymentDetails?.formData?.landmark || '',
-                            city: paymentDetails?.formData?.city || 'Your city',
-                            pincode: paymentDetails?.formData?.pincode || '000000',
-                            payment_method: 'online',
-                            payment_id: paymentId
-                        }
-                        : {
-                            request_id: requestId || `REQ-${Date.now()}`,
-                            services: [{
-                                title: jobDetails?.service_type || 'Service Payment',
-                                quantity: 1,
-                                price: totalAmount
-                            }],
-                            total: totalAmount,
-                            scheduled_date: jobDetails?.scheduled_date || new Date().toISOString(),
-                            time_slot: jobDetails?.time_slot || '09:00 AM - 11:00 AM',
-                            address: jobDetails?.address || 'Service address',
-                            landmark: jobDetails?.landmark || '',
-                            city: jobDetails?.city || 'Service city',
-                            pincode: jobDetails?.pincode || '000000',
-                            payment_method: 'online',
-                            payment_id: paymentId
-                        }
-                } 
-            });
-        }, 2000);
     };
 
     if (!paymentDetails) {
@@ -212,7 +244,9 @@ const PaymentPage = () => {
                                     : "Your service request has been confirmed."}
                             </p>
                             <p className="text-gray-500 text-sm">
-                                Redirecting to confirmation page...
+                                {isServicePayment
+                                    ? "Redirecting to transactions page..."
+                                    : "Redirecting to confirmation page..."}
                             </p>
                         </div>
                     ) : (
@@ -224,18 +258,18 @@ const PaymentPage = () => {
                                 
                                 {isServicePayment && (
                                     <div className="mb-4 bg-gray-50 p-4 rounded-md">
-                                        <h3 className="font-medium text-gray-700 mb-2">{serviceDetailsFromLocation.type}</h3>
+                                        <h3 className="font-medium text-gray-700 mb-2">{serviceDetails.type}</h3>
                                         <div className="flex justify-between text-sm mb-1">
                                             <span>Base Service Charge</span>
-                                            <span>₹{serviceDetailsFromLocation.price}</span>
+                                            <span>₹{serviceDetails.price}</span>
                                         </div>
                                         <div className="flex justify-between text-sm mb-1">
                                             <span>Additional Charges</span>
-                                            <span>₹{serviceDetailsFromLocation.additionalCharges}</span>
+                                            <span>₹{serviceDetails.additionalCharges}</span>
                                         </div>
                                         <div className="flex justify-between font-medium text-gray-800 pt-2 mt-2 border-t border-gray-200">
                                             <span>Total Amount</span>
-                                            <span>₹{serviceDetailsFromLocation.totalAmount}</span>
+                                            <span>₹{serviceDetails.totalAmount}</span>
                                         </div>
                                     </div>
                                 )}

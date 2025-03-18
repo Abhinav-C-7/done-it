@@ -24,18 +24,12 @@ const verifyToken = (req, res, next) => {
         }
         
         // Verify token
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log('Token decoded successfully:', decoded);
-            
-            // Add user info to request
-            req.user = decoded;
-            next();
-        } catch (jwtError) {
-            console.error('JWT verification error:', jwtError);
-            console.error('JWT SECRET:', process.env.JWT_SECRET ? 'Exists' : 'Missing');
-            return res.status(401).json({ message: 'Invalid token.', error: jwtError.message });
-        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Token decoded successfully:', decoded);
+        
+        // Add user info to request
+        req.user = decoded;
+        next();
     } catch (err) {
         console.error('Token verification error:', err.message);
         res.status(401).json({ message: 'Invalid token.' });
@@ -51,6 +45,26 @@ router.get('/', async (req, res) => {
         res.json(services.rows);
     } catch (err) {
         console.error('Error fetching services:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get service by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const service = await pool.query(
+            'SELECT * FROM services WHERE service_id = $1',
+            [id]
+        );
+        
+        if (service.rows.length === 0) {
+            return res.status(404).json({ message: 'Service not found' });
+        }
+        
+        res.json(service.rows[0]);
+    } catch (err) {
+        console.error(err.message);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -81,184 +95,6 @@ router.get('/search/:query', async (req, res) => {
             [`%${query}%`]
         );
         res.json(services.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get pending payments for a customer
-router.get('/pending-payments', verifyToken, async (req, res) => {
-    try {
-        console.log('Starting pending-payments endpoint');
-        console.log('User from token:', req.user);
-        
-        // Check if user is a customer
-        if (req.user.type !== 'customer') {
-            console.log('Access denied: User is not a customer, type is', req.user.type);
-            return res.status(403).json({ message: 'Access denied. Only customers can view pending payments.' });
-        }
-        
-        console.log('Fetching pending payments for customer ID:', req.user.id);
-        
-        // Check if customer_id is valid
-        if (!req.user.id) {
-            console.error('Missing customer ID in token');
-            return res.status(400).json({ message: 'Invalid customer ID: Missing ID' });
-        }
-        
-        const customerId = parseInt(req.user.id);
-        if (isNaN(customerId)) {
-            console.error('Invalid customer ID (not a number):', req.user.id);
-            return res.status(400).json({ message: 'Invalid customer ID: Not a number' });
-        }
-        
-        console.log('Parsed customer ID:', customerId);
-        
-        // Check if pool is available
-        if (!pool) {
-            console.error('Database pool is not available');
-            return res.status(500).json({ message: 'Database connection error' });
-        }
-        
-        try {
-            console.log('Executing database query...');
-            
-            // First check if the table exists
-            const tableCheck = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public'
-                    AND table_name = 'payment_requests'
-                );
-            `);
-            
-            const tableExists = tableCheck.rows[0].exists;
-            console.log('payment_requests table exists:', tableExists);
-            
-            if (!tableExists) {
-                console.log('payment_requests table does not exist, returning empty array');
-                return res.json({ pendingPayments: [] });
-            }
-            
-            // Get pending payments
-            const pendingPayments = await pool.query(
-                `SELECT pr.id, pr.request_id, pr.amount, pr.service_type, pr.created_at, 
-                pr.status, COALESCE(s.full_name, 'Assigned Serviceman') as serviceman_name
-                FROM payment_requests pr
-                LEFT JOIN serviceman_profiles s ON pr.serviceman_id = s.serviceman_id
-                WHERE pr.customer_id = $1 AND pr.status = 'pending'
-                ORDER BY pr.created_at DESC`,
-                [customerId]
-            );
-            
-            console.log('Query executed successfully');
-            console.log('Pending payments for customer', customerId, ':', pendingPayments.rows);
-            
-            return res.json({ pendingPayments: pendingPayments.rows });
-        } catch (queryErr) {
-            console.error('Database query error:', queryErr);
-            console.error('Query error stack:', queryErr.stack);
-            
-            // Check if the error is related to the table not existing
-            if (queryErr.message && queryErr.message.includes('relation "payment_requests" does not exist')) {
-                console.log('Payment requests table does not exist, returning empty array');
-                return res.json({ pendingPayments: [] });
-            }
-            
-            throw queryErr; // Re-throw to be caught by the outer catch
-        }
-    } catch (err) {
-        console.error('Error fetching pending payments:', err);
-        console.error('Error stack:', err.stack);
-        return res.status(500).json({ 
-            message: 'Server error', 
-            error: err.message,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-        });
-    }
-});
-
-// Get payment history
-router.get('/payment-history', verifyToken, async (req, res) => {
-    try {
-        // Check if user is a customer
-        if (req.user.type !== 'customer') {
-            return res.status(403).json({ message: 'Access denied' });
-        }
-        
-        console.log('Fetching payment history for customer ID:', req.user.id);
-        
-        // Get payment history
-        try {
-            // Check if payments table exists
-            const tableCheck = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public'
-                    AND table_name = 'payments'
-                );
-            `);
-            
-            const tableExists = tableCheck.rows[0].exists;
-            console.log('payments table exists:', tableExists);
-            
-            if (!tableExists) {
-                console.log('Payments table does not exist, returning empty array');
-                return res.json({ payments: [] });
-            }
-            
-            const payments = await pool.query(
-                `SELECT id, payment_id, amount, 
-                COALESCE(payment_type, 'service_payment') as payment_type, 
-                COALESCE(service_type, 'Service') as service_type, 
-                created_at as date, 
-                COALESCE(status, 'completed') as status
-                FROM payments
-                WHERE customer_id = $1
-                ORDER BY created_at DESC`,
-                [req.user.id]
-            );
-            
-            console.log('Payment history for customer', req.user.id, ':', payments.rows);
-            
-            res.json({ payments: payments.rows });
-        } catch (queryErr) {
-            console.error('Database query error:', queryErr);
-            
-            if (queryErr.message.includes('relation "payments" does not exist')) {
-                console.log('Payments table does not exist, returning empty array');
-                return res.json({ payments: [] });
-            }
-            
-            throw queryErr;
-        }
-    } catch (err) {
-        console.error('Error fetching payment history:', err);
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-});
-
-// Get service by ID
-router.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // Check if the ID is a number to avoid conflicts with other routes
-        if (isNaN(parseInt(id))) {
-            return res.status(400).json({ message: 'Invalid service ID format' });
-        }
-        
-        const service = await pool.query(
-            'SELECT * FROM services WHERE service_id = $1',
-            [id]
-        );
-        
-        if (service.rows.length === 0) {
-            return res.status(404).json({ message: 'Service not found' });
-        }
-        
-        res.json(service.rows[0]);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ message: 'Server error' });
@@ -651,201 +487,6 @@ router.get('/my-orders', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('Error fetching orders:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
-    }
-});
-
-// Create a payment request for a service
-router.post('/create-payment-request', verifyToken, async (req, res) => {
-    try {
-        const { requestId, amount, serviceType, customerId } = req.body;
-        
-        console.log('Creating payment request with data:', { requestId, amount, serviceType, customerId });
-        
-        // Validate input
-        if (!requestId || !amount || amount <= 0 || !serviceType || !customerId) {
-            return res.status(400).json({ message: 'Invalid payment request data' });
-        }
-        
-        // Check if user is a serviceman or customer
-        if (req.user.type !== 'serviceman' && req.user.type !== 'customer') {
-            return res.status(403).json({ message: 'Only servicemen and customers can create payment requests' });
-        }
-        
-        // Check if payment_requests table exists, create if not
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS payment_requests (
-                id SERIAL PRIMARY KEY,
-                request_id VARCHAR(255) NOT NULL,
-                customer_id INTEGER NOT NULL,
-                serviceman_id INTEGER NOT NULL,
-                amount DECIMAL(10, 2) NOT NULL,
-                service_type VARCHAR(255) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                notes TEXT,
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMP
-            )
-        `);
-        
-        // Check if a payment request already exists for this service request
-        const existingRequest = await pool.query(
-            `SELECT * FROM payment_requests 
-            WHERE request_id = $1 AND customer_id = $2 AND serviceman_id = $3 AND status = 'pending'`,
-            [requestId, customerId, req.user.id]
-        );
-        
-        if (existingRequest.rows.length > 0) {
-            console.log('Payment request already exists, updating amount');
-            // Update the existing payment request
-            await pool.query(
-                `UPDATE payment_requests 
-                SET amount = $1, updated_at = NOW() 
-                WHERE request_id = $2 AND customer_id = $3 AND serviceman_id = $4 AND status = 'pending'`,
-                [amount, requestId, customerId, req.user.id]
-            );
-            
-            return res.status(200).json({
-                message: 'Payment request updated successfully',
-                paymentRequestId: existingRequest.rows[0].id
-            });
-        }
-        
-        // Create payment request record
-        const result = await pool.query(
-            `INSERT INTO payment_requests 
-            (request_id, customer_id, serviceman_id, amount, service_type, status, created_at) 
-            VALUES ($1, $2, $3, $4, $5, $6, NOW()) 
-            RETURNING id`,
-            [requestId, customerId, req.user.id, amount, serviceType, 'pending']
-        );
-        
-        console.log('Payment request created with ID:', result.rows[0].id);
-        
-        // Check if notifications table exists
-        try {
-            await pool.query(`
-                CREATE TABLE IF NOT EXISTS notifications (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    user_type VARCHAR(50) NOT NULL,
-                    title VARCHAR(255) NOT NULL,
-                    message TEXT NOT NULL,
-                    related_id VARCHAR(255),
-                    related_type VARCHAR(50),
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                    is_read BOOLEAN DEFAULT FALSE
-                )
-            `);
-            
-            // Create notification for the customer
-            await pool.query(
-                `INSERT INTO notifications 
-                (user_id, user_type, title, message, related_id, related_type, created_at, is_read) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), false)`,
-                [
-                    customerId, 
-                    'customer', 
-                    'Payment Required', 
-                    `Your ${serviceType} service has been completed. Please make a payment of ₹${amount}.`,
-                    requestId,
-                    'payment_request'
-                ]
-            );
-            
-            console.log('Notification created for customer:', customerId);
-        } catch (notificationErr) {
-            console.error('Error creating notification:', notificationErr);
-            // Continue even if notification creation fails
-        }
-        
-        res.status(201).json({
-            message: 'Payment request created successfully',
-            paymentRequestId: result.rows[0].id
-        });
-    } catch (err) {
-        console.error('Error creating payment request:', err);
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-});
-
-// Update payment request status
-router.put('/update-payment-request/:requestId', verifyToken, async (req, res) => {
-    try {
-        const { requestId } = req.params;
-        const { status } = req.body;
-        
-        // Validate input
-        if (!requestId || !status) {
-            return res.status(400).json({ message: 'Invalid request data' });
-        }
-        
-        // Update payment request status
-        await pool.query(
-            `UPDATE payment_requests 
-            SET status = $1, updated_at = NOW() 
-            WHERE id = $2`,
-            [status, requestId]
-        );
-        
-        res.json({ message: 'Payment request updated successfully' });
-    } catch (err) {
-        console.error('Error updating payment request:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Record a payment
-router.post('/record-payment', verifyToken, async (req, res) => {
-    try {
-        const { paymentId, amount, serviceId, requestId, paymentType, serviceType } = req.body;
-        
-        // Validate input
-        if (!paymentId || !amount || amount <= 0 || !paymentType) {
-            return res.status(400).json({ message: 'Invalid payment data' });
-        }
-        
-        // Create payments table if it doesn't exist
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS payments (
-                id SERIAL PRIMARY KEY,
-                payment_id VARCHAR(255) NOT NULL,
-                customer_id INTEGER NOT NULL,
-                amount DECIMAL(10, 2) NOT NULL,
-                payment_type VARCHAR(50) NOT NULL,
-                service_type VARCHAR(255),
-                service_id VARCHAR(255),
-                request_id VARCHAR(255),
-                status VARCHAR(50) NOT NULL DEFAULT 'completed',
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMP
-            )
-        `);
-        
-        // Create payment record
-        await pool.query(
-            `INSERT INTO payments 
-            (payment_id, customer_id, amount, payment_type, service_type, created_at, status) 
-            VALUES ($1, $2, $3, $4, $5, NOW(), 'completed')`,
-            [paymentId, req.user.id, amount, paymentType, serviceType]
-        );
-        
-        // If this is a service payment, update the payment request status
-        if (paymentType === 'service_payment' && requestId) {
-            await pool.query(
-                `UPDATE payment_requests 
-                SET status = 'paid', updated_at = NOW() 
-                WHERE request_id = $1 AND customer_id = $2`,
-                [requestId, req.user.id]
-            );
-        }
-        
-        res.status(201).json({
-            message: 'Payment recorded successfully',
-            paymentId
-        });
-    } catch (err) {
-        console.error('Error recording payment:', err);
-        res.status(500).json({ message: 'Server error' });
     }
 });
 
