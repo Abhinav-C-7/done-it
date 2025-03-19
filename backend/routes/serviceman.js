@@ -727,7 +727,7 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
         try {
             // Check if the job belongs to this serviceman and if price is already finalized
             const jobCheck = await pool.query(
-                'SELECT customer_id, job_status, price_finalized FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
+                'SELECT customer_id, job_status, price_finalized, service_type FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
                 [requestId, servicemanId]
             );
 
@@ -739,6 +739,7 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
             const customerId = jobCheck.rows[0].customer_id;
             const jobStatus = jobCheck.rows[0].job_status;
             const priceFinalized = jobCheck.rows[0].price_finalized;
+            const serviceType = jobCheck.rows[0].service_type;
 
             // Check if price is already finalized
             if (priceFinalized) {
@@ -759,6 +760,23 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
             );
 
             console.log(`Successfully updated price to ${price} and set price_finalized to true for request ${requestId}`);
+
+            // Create an entry in the payment_requests table
+            await pool.query(
+                `INSERT INTO payment_requests 
+                (request_id, customer_id, serviceman_id, amount, service_type, status, created_at) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                [
+                    requestId, 
+                    customerId, 
+                    servicemanId, 
+                    price,
+                    serviceType,
+                    'pending'
+                ]
+            );
+
+            console.log(`Created payment request for request_id ${requestId} with amount ${price}`);
 
             // Get serviceman details for notification
             const servicemanDetails = await pool.query(
@@ -790,7 +808,7 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
                         customerId, 
                         'customer', 
                         'Price Finalized', 
-                        `${serviceman.full_name} has finalized the price for your service request: ₹${price}`,
+                        `${serviceman.full_name} has finalized the price for your service request: ₹${price}. Please proceed with payment.`,
                         'price_update',
                         requestId,
                         false
