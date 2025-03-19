@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from "../components/Navbar";
 import ProgressBar from "../components/ProgressBar";
@@ -12,8 +12,17 @@ function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Check if we have a message from the redirect
+    useEffect(() => {
+        if (location.state?.message) {
+            setMessage(location.state.message);
+        }
+    }, [location]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -31,7 +40,10 @@ function Login() {
             const response = await login(email, password);
             console.log('Login response received:', response);
             
-            if (isAdmin) {
+            // Check if we need to redirect to a specific page after login
+            if (location.state?.redirectTo) {
+                navigate(location.state.redirectTo);
+            } else if (isAdmin) {
                 console.log('Redirecting admin to welcome page');
                 navigate('/admin-welcome');
             } else if (isServiceman) {
@@ -66,6 +78,12 @@ function Login() {
                             {error && (
                                 <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r">
                                     <p className="text-red-700 text-sm">{error}</p>
+                                </div>
+                            )}
+
+                            {message && (
+                                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded-r">
+                                    <p className="text-blue-700 text-sm">{message}</p>
                                 </div>
                             )}
 

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { serviceApi } from '../services/api';
 import Layout from '../components/Layout';
+import LoginPrompt from '../components/LoginPrompt';
 
 const SUB_SERVICES = {
     'ac': [
@@ -63,7 +65,9 @@ function ServiceDetails() {
     const { serviceType } = useParams();
     const navigate = useNavigate();
     const { addToCart } = useCart();
+    const { user } = useAuth();
     const [selectedServices, setSelectedServices] = useState([]);
+    const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
     const subServices = SUB_SERVICES[serviceType] || [];
     const serviceTitle = SERVICE_TITLES[serviceType] || 'Service Details';
@@ -80,6 +84,13 @@ function ServiceDetails() {
     const handleProceedToCheckout = () => {
         if (selectedServices.length === 0) {
             alert('Please select at least one service');
+            return;
+        }
+
+        // Check if user is logged in
+        if (!user) {
+            // Show login prompt instead of redirecting
+            setShowLoginPrompt(true);
             return;
         }
 
@@ -176,6 +187,15 @@ function ServiceDetails() {
                     </div>
                 </div>
             </div>
+
+            {/* Login Prompt Modal */}
+            {showLoginPrompt && (
+                <LoginPrompt 
+                    message="Please log in or create an account to continue with your service request"
+                    redirectPath={`/services/${serviceType}`}
+                    onClose={() => setShowLoginPrompt(false)}
+                />
+            )}
         </Layout>
     );
 }

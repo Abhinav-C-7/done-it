@@ -101,6 +101,7 @@ function App() {
                 <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
                   <Routes>
                     {/* Public routes */}
+                    <Route path="/" element={<Home />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/verify-email" element={<VerifyEmail />} />
@@ -110,10 +111,40 @@ function App() {
                     <Route path="/admin-welcome" element={<AdminWelcome />} />
                     <Route path="/services" element={<Services />} />
                     <Route path="/services/:serviceType" element={<ServiceDetails />} />
-                    <Route path="/service-request" element={<ServiceRequest />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/payment" element={<PaymentPage />} />
-                    <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                    
+                    {/* Routes that require authentication */}
+                    <Route
+                      path="/service-request"
+                      element={
+                        <PrivateRoute userType="customer">
+                          <ServiceRequest />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/checkout"
+                      element={
+                        <PrivateRoute userType="customer">
+                          <Checkout />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/payment"
+                      element={
+                        <PrivateRoute userType="customer">
+                          <PaymentPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/order-confirmation"
+                      element={
+                        <PrivateRoute userType="customer">
+                          <OrderConfirmation />
+                        </PrivateRoute>
+                      }
+                    />
                     <Route
                       path="/orders"
                       element={
@@ -164,14 +195,6 @@ function App() {
                     />
 
                     {/* Protected customer routes */}
-                    <Route
-                      path="/"
-                      element={
-                        <PrivateRoute userType="customer">
-                          <Home />
-                        </PrivateRoute>
-                      }
-                    />
                     <Route
                       path="/profile"
                       element={
