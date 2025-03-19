@@ -296,6 +296,9 @@ router.post('/serviceman/register', async (req, res) => {
             current_location
         } = req.body;
         
+        console.log('Received registration data:', req.body);
+        console.log('Current location from request:', current_location);
+        
         // Validation
         if (!email || !password || !full_name || !phone_number || !address || !city || !pincode || !skills || !id_proof_path || !current_location) {
             return res.status(400).json({ 
@@ -354,7 +357,7 @@ router.post('/serviceman/register', async (req, res) => {
                 current_location
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-                POINT($11)
+                $11::point
             ) RETURNING *`,
             [
                 email, 

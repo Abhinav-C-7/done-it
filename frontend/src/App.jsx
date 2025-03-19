@@ -12,6 +12,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ServicemanRegister from './pages/ServicemanRegister';
+import ServicemanRegisterSuccess from './pages/ServicemanRegisterSuccess';
 import ServicemanDashboard from './pages/ServicemanDashboard';
 import CustomerDashboard from './pages/CustomerDashboard';
 import Services from './components/Services';
@@ -102,6 +103,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/serviceman-register" element={<ServicemanRegister />} />
+                    <Route path="/serviceman-register-success" element={<ServicemanRegisterSuccess />} />
                     <Route path="/worker/welcome" element={<WorkerWelcome />} />
                     <Route path="/admin-welcome" element={<AdminWelcome />} />
                     <Route path="/services" element={<Services />} />

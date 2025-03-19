@@ -26,6 +26,7 @@ function ServicemanRegister() {
     const [searchQuery, setSearchQuery] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [selectedLocation, setSelectedLocation] = useState(null);
+    const [isRegistrationSuccessful, setIsRegistrationSuccessful] = useState(false);
     const mapRef = useRef(null);
     const navigate = useNavigate();
     const { registerServiceman } = useAuth();
@@ -237,12 +238,21 @@ function ServicemanRegister() {
 
         try {
             console.log('Submitting registration with current_location:', formData.current_location);
-            const response = await registerServiceman(formData);
+            
+            // Create a copy of the form data to avoid modifying the original state
+            const formDataToSubmit = { ...formData };
+            
+            // Make sure current_location is in the format PostgreSQL expects
+            if (formDataToSubmit.current_location && !formDataToSubmit.current_location.startsWith('(')) {
+                formDataToSubmit.current_location = `(${formDataToSubmit.current_location})`;
+            }
+            
+            console.log('Formatted current_location for submission:', formDataToSubmit.current_location);
+            
+            const response = await registerServiceman(formDataToSubmit);
             if (response.success) {
-                setSuccess('Registration submitted successfully! Pending admin approval.');
-                setTimeout(() => {
-                    navigate('/login');
-                }, 3000);
+                setIsRegistrationSuccessful(true);
+                setSuccess('Registration submitted successfully!');
             }
         } catch (err) {
             console.error('Registration error:', err);
@@ -250,338 +260,388 @@ function ServicemanRegister() {
         }
     };
 
+    // Add useEffect for auto-redirect on successful registration
+    useEffect(() => {
+        if (isRegistrationSuccessful) {
+            const timer = setTimeout(() => {
+                navigate('/login');
+            }, 5000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isRegistrationSuccessful, navigate]);
+
+    // Add a separate success component to render when registration is successful
+    const SuccessMessage = () => (
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-8 text-center">
+            <div className="flex justify-center mb-6">
+                <svg className="w-16 h-16 text-green-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Registration Successful!</h1>
+            <p className="text-gray-600 mb-6">
+                Your application has been submitted successfully. Please wait for admin approval.
+                You will be notified via email once your application is approved.
+            </p>
+            <div className="bg-gray-100 p-4 rounded-lg mb-6">
+                <p className="text-gray-700 font-medium">What happens next?</p>
+                <ol className="text-left text-gray-600 mt-2 pl-5 list-decimal">
+                    <li>Our admin team will review your application</li>
+                    <li>You'll receive an email notification about the status</li>
+                    <li>Once approved, you can login and start accepting jobs</li>
+                </ol>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+                You will be redirected to the login page in a few seconds...
+            </p>
+            <button 
+                onClick={() => navigate('/login')} 
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
+            >
+                Go to Login
+            </button>
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-yellow-100">
             <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
-                <div className="w-full max-w-2xl">
-                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-                        {/* Header Section */}
-                        <div className="px-8 py-6 bg-gradient-to-r from-yellow-400 to-yellow-500">
-                            <h1 className="text-3xl font-bold text-white text-center">Serviceman Registration</h1>
-                            <p className="text-yellow-100 text-center mt-2">Join our team of service providers</p>
-                        </div>
+                {isRegistrationSuccessful ? (
+                    // Success message
+                    <SuccessMessage />
+                ) : (
+                    // Registration form
+                    <div className="w-full max-w-2xl">
+                        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                            {/* Header Section */}
+                            <div className="px-8 py-6 bg-gradient-to-r from-yellow-400 to-yellow-500">
+                                <h1 className="text-3xl font-bold text-white text-center">Serviceman Registration</h1>
+                                <p className="text-yellow-100 text-center mt-2">Join our team of service providers</p>
+                            </div>
 
-                        {/* Form Section */}
-                        <div className="p-8">
-                            {error && (
-                                <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r">
-                                    <p className="text-red-700 text-sm">{error}</p>
-                                </div>
-                            )}
-                            {success && (
-                                <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-r">
-                                    <p className="text-green-700 text-sm">{success}</p>
-                                </div>
-                            )}
-
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                {/* Personal Information */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Full Name *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="full_name"
-                                            value={formData.full_name}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter your full name"
-                                            required
-                                        />
+                            {/* Form Section */}
+                            <div className="p-8">
+                                {error && (
+                                    <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r">
+                                        <p className="text-red-700 text-sm">{error}</p>
                                     </div>
-
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Email Address *
-                                        </label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="name@serviceman.doneit.com"
-                                            required
-                                        />
+                                )}
+                                {success && (
+                                    <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-r">
+                                        <p className="text-green-700 text-sm">{success}</p>
                                     </div>
+                                )}
 
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Password *
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            value={formData.password}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter your password"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Phone Number *
-                                        </label>
-                                        <input
-                                            type="tel"
-                                            name="phone_number"
-                                            value={formData.phone_number}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter your phone number"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Address Information */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="md:col-span-2">
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Address *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="address"
-                                            value={formData.address}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter your complete address"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            City *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="city"
-                                            value={formData.city}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter your city"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                            Pincode *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="pincode"
-                                            value={formData.pincode}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                            placeholder="Enter 6-digit pincode"
-                                            pattern="[0-9]{6}"
-                                            title="Pincode must be exactly 6 digits"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Skills Selection */}
-                                <div>
-                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                        Select Your Skills *
-                                    </label>
-                                    <div className="bg-white p-4 rounded-xl border border-gray-200">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto mb-4 p-2">
-                                            {services.map(service => (
-                                                <div 
-                                                    key={service.service_id}
-                                                    className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${
-                                                        formData.skills.includes(service.title)
-                                                            ? 'bg-yellow-50'
-                                                            : 'hover:bg-gray-50'
-                                                    }`}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`skill-${service.service_id}`}
-                                                        value={service.title}
-                                                        checked={formData.skills.includes(service.title)}
-                                                        onChange={(e) => {
-                                                            const value = e.target.value;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                skills: e.target.checked 
-                                                                    ? [...prev.skills, value]
-                                                                    : prev.skills.filter(skill => skill !== value)
-                                                            }));
-                                                        }}
-                                                        className="w-5 h-5 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400"
-                                                    />
-                                                    <label 
-                                                        htmlFor={`skill-${service.service_id}`}
-                                                        className="flex-grow text-gray-700 cursor-pointer select-none hover:text-yellow-600"
-                                                    >
-                                                        {service.title}
-                                                    </label>
-                                                </div>
-                                            ))}
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {/* Personal Information */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Full Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="full_name"
+                                                value={formData.full_name}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter your full name"
+                                                required
+                                            />
                                         </div>
-                                        
-                                        {/* Selected Skills Preview */}
-                                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                                            <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                </svg>
-                                                Selected Skills ({formData.skills.length})
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {formData.skills.map(skill => (
-                                                    <span
-                                                        key={skill}
-                                                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 transition-all duration-200 hover:bg-yellow-200"
+
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Email Address *
+                                            </label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value={formData.email}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="name@serviceman.doneit.com"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Password *
+                                            </label>
+                                            <input
+                                                type="password"
+                                                name="password"
+                                                value={formData.password}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter your password"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Phone Number *
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                name="phone_number"
+                                                value={formData.phone_number}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter your phone number"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Address Information */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Address *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="address"
+                                                value={formData.address}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter your complete address"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                City *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="city"
+                                                value={formData.city}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter your city"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                                Pincode *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="pincode"
+                                                value={formData.pincode}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                                placeholder="Enter 6-digit pincode"
+                                                pattern="[0-9]{6}"
+                                                title="Pincode must be exactly 6 digits"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Skills Selection */}
+                                    <div>
+                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                            Select Your Skills *
+                                        </label>
+                                        <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto mb-4 p-2">
+                                                {services.map(service => (
+                                                    <div 
+                                                        key={service.service_id}
+                                                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${
+                                                            formData.skills.includes(service.title)
+                                                                ? 'bg-yellow-50'
+                                                                : 'hover:bg-gray-50'
+                                                        }`}
                                                     >
-                                                        {skill}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`skill-${service.service_id}`}
+                                                            value={service.title}
+                                                            checked={formData.skills.includes(service.title)}
+                                                            onChange={(e) => {
+                                                                const value = e.target.value;
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    skills: prev.skills.filter(s => s !== skill)
+                                                                    skills: e.target.checked 
+                                                                        ? [...prev.skills, value]
+                                                                        : prev.skills.filter(skill => skill !== value)
                                                                 }));
                                                             }}
-                                                            className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-200 text-yellow-800 hover:bg-yellow-300 hover:text-yellow-900 transition-colors duration-200"
+                                                            className="w-5 h-5 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400"
+                                                        />
+                                                        <label 
+                                                            htmlFor={`skill-${service.service_id}`}
+                                                            className="flex-grow text-gray-700 cursor-pointer select-none hover:text-yellow-600"
                                                         >
-                                                            ×
-                                                        </button>
-                                                    </span>
+                                                            {service.title}
+                                                        </label>
+                                                    </div>
                                                 ))}
-                                                {formData.skills.length === 0 && (
-                                                    <span className="text-sm text-gray-500 italic">
-                                                        No skills selected
-                                                    </span>
-                                                )}
+                                            </div>
+                                            
+                                            {/* Selected Skills Preview */}
+                                            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                                                <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Selected Skills ({formData.skills.length})
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {formData.skills.map(skill => (
+                                                        <span
+                                                            key={skill}
+                                                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 transition-all duration-200 hover:bg-yellow-200"
+                                                        >
+                                                            {skill}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        skills: prev.skills.filter(s => s !== skill)
+                                                                    }));
+                                                                }}
+                                                                className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-200 text-yellow-800 hover:bg-yellow-300 hover:text-yellow-900 transition-colors duration-200"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                    {formData.skills.length === 0 && (
+                                                        <span className="text-sm text-gray-500 italic">
+                                                            No skills selected
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="mt-4 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData(prev => ({ ...prev, skills: [] }))}
+                                                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-200"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Clear All
+                                                </button>
                                             </div>
                                         </div>
+                                        {formData.skills.length === 0 && (
+                                            <p className="text-sm text-red-500 mt-1 flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                </svg>
+                                                Please select at least one skill
+                                            </p>
+                                        )}
+                                    </div>
 
-                                        {/* Action Buttons */}
-                                        <div className="mt-4 flex justify-end">
+                                    {/* ID Proof Upload */}
+                                    <div>
+                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                            Upload ID Proof *
+                                        </label>
+                                        <input
+                                            type="file"
+                                            name="id_proof"
+                                            onChange={handleFileChange}
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                            required
+                                        />
+                                        <p className="text-sm text-gray-500 mt-1">Upload Aadhar/PAN/Driving License (PDF/JPG/PNG)</p>
+                                    </div>
+
+                                    {/* Preferred Work Location */}
+                                    <div>
+                                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                            Preferred Work Location *
+                                        </label>
+                                        <div className="flex items-center">
+                                            <input
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={handleSearchChange}
+                                                placeholder="Search for a location"
+                                                className="flex-grow px-4 py-3 rounded-l-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                            />
                                             <button
                                                 type="button"
-                                                onClick={() => setFormData(prev => ({ ...prev, skills: [] }))}
-                                                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-200"
+                                                onClick={() => setShowMap(true)}
+                                                className="px-4 py-3 bg-yellow-400 text-white rounded-r-xl hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                </svg>
-                                                Clear All
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {formData.skills.length === 0 && (
-                                        <p className="text-sm text-red-500 mt-1 flex items-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
-                                            Please select at least one skill
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* ID Proof Upload */}
-                                <div>
-                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                        Upload ID Proof *
-                                    </label>
-                                    <input
-                                        type="file"
-                                        name="id_proof"
-                                        onChange={handleFileChange}
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                        required
-                                    />
-                                    <p className="text-sm text-gray-500 mt-1">Upload Aadhar/PAN/Driving License (PDF/JPG/PNG)</p>
-                                </div>
-
-                                {/* Preferred Work Location */}
-                                <div>
-                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
-                                        Preferred Work Location *
-                                    </label>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={handleSearchChange}
-                                            placeholder="Search for a location"
-                                            className="flex-grow px-4 py-3 rounded-l-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowMap(true)}
-                                            className="px-4 py-3 bg-yellow-400 text-white rounded-r-xl hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Location Suggestions */}
-                                    {suggestions.length > 0 && (
-                                        <div className="mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                            {suggestions.map((suggestion, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="px-4 py-2 hover:bg-yellow-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                                    onClick={() => handleLocationSelect(suggestion)}
-                                                >
-                                                    {suggestion.display_name}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    {formData.current_location && (
-                                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                                            <div className="flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                                     <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                                                 </svg>
-                                                Location selected
-                                            </div>
-                                            {selectedLocation && (
-                                                <p className="mt-1 ml-7 text-xs text-green-600">
-                                                    {selectedLocation.address}
-                                                </p>
-                                            )}
+                                            </button>
                                         </div>
-                                    )}
-                                    
-                                    {!formData.current_location && (
-                                        <p className="text-sm text-red-500 mt-1 flex items-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
-                                            Please select your preferred work location
-                                        </p>
-                                    )}
-                                </div>
+                                        
+                                        {/* Location Suggestions */}
+                                        {suggestions.length > 0 && (
+                                            <div className="mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                {suggestions.map((suggestion, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="px-4 py-2 hover:bg-yellow-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                        onClick={() => handleLocationSelect(suggestion)}
+                                                    >
+                                                        {suggestion.display_name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        
+                                        {formData.current_location && (
+                                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                                                <div className="flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Location selected
+                                                </div>
+                                                {selectedLocation && (
+                                                    <p className="mt-1 ml-7 text-xs text-green-600">
+                                                        {selectedLocation.address}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                        
+                                        {!formData.current_location && (
+                                            <p className="text-sm text-red-500 mt-1 flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                </svg>
+                                                Please select your preferred work location
+                                            </p>
+                                        )}
+                                    </div>
 
-                                <button
-                                    type="submit"
-                                    className="w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
-                                >
-                                    Register as Serviceman
-                                </button>
-                            </form>
+                                    <button
+                                        type="submit"
+                                        className="w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
+                                    >
+                                        Register as Serviceman
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
             
             {/* Map Modal */}
