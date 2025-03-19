@@ -17,7 +17,17 @@ const SERVICE_ROUTES = {
         title: 'Plumbing Services',
         category: 'Plumbing'
     },
+    'Plumbing Services': {
+        route: '/services/plumbing',
+        title: 'Plumbing Services',
+        category: 'Plumbing'
+    },
     'Electrical Repair': {
+        route: '/services/electrical',
+        title: 'Electrical Services',
+        category: 'Electrical'
+    },
+    'Electrical Services': {
         route: '/services/electrical',
         title: 'Electrical Services',
         category: 'Electrical'
@@ -37,7 +47,27 @@ const SERVICE_ROUTES = {
         title: 'Cleaning Services',
         category: 'Cleaning'
     },
+    'House Cleaning': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    },
+    'House Cleaning Services': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    },
+    'Cleaning Services': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    },
     'Painting Service': {
+        route: '/services/painting',
+        title: 'Painting Services',
+        category: 'Painting'
+    },
+    'Painting Services': {
         route: '/services/painting',
         title: 'Painting Services',
         category: 'Painting'
@@ -62,7 +92,17 @@ const SERVICE_ROUTES = {
         title: 'Pest Control Services',
         category: 'Cleaning'
     },
+    'Pest Control': {
+        route: '/services/pestcontrol',
+        title: 'Pest Control Services',
+        category: 'Cleaning'
+    },
     'Carpentry Work': {
+        route: '/services/carpentry',
+        title: 'Carpentry Services',
+        category: 'Carpentry'
+    },
+    'Carpentry Services': {
         route: '/services/carpentry',
         title: 'Carpentry Services',
         category: 'Carpentry'

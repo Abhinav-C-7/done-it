@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Layout from "../components/Layout";
 import Searchbar from "../components/Searchbar";
@@ -11,8 +11,53 @@ import profile from "../assets/images/profile.png";
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
+// Define service title mappings and their routes - same as in Services.jsx
+const SERVICE_ROUTES = {
+    'AC Service': {
+        route: '/services/ac',
+        title: 'AC Services',
+        category: 'Appliance Repair'
+    },
+    'Plumbing Repair': {
+        route: '/services/plumbing',
+        title: 'Plumbing Services',
+        category: 'Plumbing'
+    },
+    'Plumbing Services': {
+        route: '/services/plumbing',
+        title: 'Plumbing Services',
+        category: 'Plumbing'
+    },
+    'Electrical Repair': {
+        route: '/services/electrical',
+        title: 'Electrical Services',
+        category: 'Electrical'
+    },
+    'Electrical Services': {
+        route: '/services/electrical',
+        title: 'Electrical Services',
+        category: 'Electrical'
+    },
+    'House Cleaning': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    },
+    'House Cleaning Services': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    },
+    'Cleaning Services': {
+        route: '/services/cleaning',
+        title: 'Cleaning Services',
+        category: 'Cleaning'
+    }
+};
+
 function Home() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [popularServices, setPopularServices] = useState([]);
@@ -26,6 +71,22 @@ function Home() {
 
     const handleCategorySelect = (category) => {
         setSelectedCategory(category === selectedCategory ? "" : category);
+    };
+
+    // Handle service card click - same as in Services.jsx
+    const handleServiceClick = (service) => {
+        const title = service.title?.trim();
+        if (SERVICE_ROUTES[title]) {
+            navigate(SERVICE_ROUTES[title].route);
+        } else {
+            const matchingTitle = Object.keys(SERVICE_ROUTES).find(key => 
+                title.toLowerCase().includes(key.toLowerCase()) || 
+                key.toLowerCase().includes(title.toLowerCase())
+            );
+            if (matchingTitle) {
+                navigate(SERVICE_ROUTES[matchingTitle].route);
+            }
+        }
     };
 
     // Fetch popular services, recent bookings, and testimonials
@@ -136,22 +197,6 @@ function Home() {
                             </div>
                         </div>
 
-                        {/* Promotion Banner */}
-                        <div className="bg-blue-100 border-l-4 border-blue-500 p-4 mb-8 rounded-r-lg">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <svg className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div className="ml-3">
-                                    <p className="text-sm text-blue-700">
-                                        <span className="font-bold">Special Offer:</span> Get 20% off on your first booking! Use code WELCOME20
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* Search and Filter Section */}
                         <div className="mb-8">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
@@ -186,12 +231,10 @@ function Home() {
                                     {popularServices.map((service) => (
                                         <div
                                             key={service.service_id}
-                                            className="border border-yellow-200 bg-gradient-to-br from-yellow-50 to-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer transform hover:scale-105 relative overflow-hidden"
+                                            className="border rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 bg-white flex flex-col cursor-pointer transform hover:scale-105"
+                                            onClick={() => handleServiceClick(service)}
                                         >
-                                            <div className="absolute top-0 right-0 bg-yellow-500 text-white px-2 py-1 text-xs font-bold">
-                                                {service.bookings}+ bookings
-                                            </div>
-                                            <div className="h-40 overflow-hidden">
+                                            <div className="relative overflow-hidden" style={{ height: '200px' }}>
                                                 <img
                                                     src={`${API_BASE_URL}${service.image_url}`}
                                                     alt={service.title}
@@ -201,6 +244,9 @@ function Home() {
                                                         e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200' viewBox='0 0 300 200'%3E%3Crect width='300' height='200' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='24' text-anchor='middle' dominant-baseline='middle' fill='%23999'%3EService%3C/text%3E%3C/svg%3E";
                                                     }}
                                                 />
+                                                <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 text-xs font-bold rounded-full">
+                                                    {service.bookings}+ bookings
+                                                </div>
                                             </div>
                                             <div className="p-4">
                                                 <h3 className="text-lg font-semibold">{service.title}</h3>

@@ -14,40 +14,37 @@ const SUB_SERVICES = {
         { id: 4, title: 'Gas Refill', price: 1299, description: 'AC gas refill and leak detection', variablePrice: true }
     ],
     'plumbing': [
-        { id: 5, title: 'Pipe Repair', price: 499, description: 'Fix leaking pipes and plumbing issues' },
-        { id: 6, title: 'Tap Installation', price: 299, description: 'Install or replace taps and faucets' },
-        { id: 7, title: 'Toilet Repair', price: 599, description: 'Toilet repair and installation services' },
-        { id: 8, title: 'Water Tank', price: 899, description: 'Water tank cleaning and maintenance' }
+        { id: 5, title: 'General Plumbing', price: 100, description: 'General plumbing repairs and installation', variablePrice: true }
     ],
     'electrical': [
-        { id: 9, title: 'Wiring Work', price: 699, description: 'Electrical wiring and rewiring services' },
-        { id: 10, title: 'Switch Board', price: 399, description: 'Switch board repair and installation' },
-        { id: 11, title: 'Light Fitting', price: 299, description: 'Light installation and replacement' },
-        { id: 12, title: 'Fan Repair', price: 399, description: 'Fan repair and maintenance services' }
+        { id: 9, title: 'Wiring Works', price: 200, description: 'Electrical wiring and rewiring services', variablePrice: true },
+        { id: 10, title: 'Switch Board Fitting', price: 100, description: 'Switch board repair and installation per switch board', variablePrice: true },
+        { id: 11, title: 'Light Fitting', price: 100, description: 'Light installation and replacement per light installed', variablePrice: true },
+        { id: 12, title: 'General Repair', price: 100, description: 'General electrical repairs (minimum charge)', variablePrice: true }
     ],
     'cleaning': [
-        { id: 13, title: 'Deep Cleaning', price: 1999, description: 'Complete house deep cleaning service' },
-        { id: 14, title: 'Kitchen Cleaning', price: 899, description: 'Professional kitchen cleaning service' },
-        { id: 15, title: 'Bathroom Cleaning', price: 699, description: 'Thorough bathroom cleaning service' },
-        { id: 16, title: 'Sofa Cleaning', price: 599, description: 'Sofa and upholstery cleaning service' }
+        { id: 13, title: '1 BHK Cleaning', price: 2500, description: 'Complete house cleaning for 1 BHK', variablePrice: true, priceRange: '₹2,500 - ₹4,500' },
+        { id: 14, title: '2 BHK Cleaning', price: 3500, description: 'Complete house cleaning for 2 BHK', variablePrice: true, priceRange: '₹3,500 - ₹6,500' },
+        { id: 15, title: '3 BHK Cleaning', price: 5000, description: 'Complete house cleaning for 3 BHK', variablePrice: true, priceRange: '₹5,000 - ₹9,000' },
+        { id: 16, title: '4 BHK Cleaning', price: 7000, description: 'Complete house cleaning for 4 BHK', variablePrice: true, priceRange: '₹7,000 - ₹12,000' }
     ],
     'painting': [
-        { id: 17, title: 'Interior Painting', price: 15999, description: 'Interior house painting service' },
-        { id: 18, title: 'Exterior Painting', price: 19999, description: 'Exterior house painting service' },
-        { id: 19, title: 'Wall Texturing', price: 2499, description: 'Decorative wall texturing service' },
-        { id: 20, title: 'Wood Painting', price: 1299, description: 'Wood furniture painting service' }
+        { id: 17, title: 'Interior Painting', price: 10, description: 'Interior house painting service per sq. ft.', variablePrice: true, priceRange: '₹10 - ₹30 per sq. ft.' },
+        { id: 18, title: 'Exterior Painting', price: 12, description: 'Exterior house painting service per sq. ft.', variablePrice: true, priceRange: '₹12 - ₹40 per sq. ft.' },
+        { id: 19, title: 'Textured/Designer Painting', price: 50, description: 'Decorative wall texturing service per sq. ft.', variablePrice: true, priceRange: '₹50 - ₹200 per sq. ft.' },
+        { id: 20, title: 'Wood Painting', price: 30, description: 'Wood furniture painting service per sq. ft.', variablePrice: true }
     ],
     'pestcontrol': [
-        { id: 21, title: 'General Pest Control', price: 1299, description: 'Complete pest control treatment' },
-        { id: 22, title: 'Cockroach Control', price: 899, description: 'Cockroach control treatment' },
-        { id: 23, title: 'Termite Control', price: 2499, description: 'Termite inspection and control' },
-        { id: 24, title: 'Bed Bug Control', price: 1499, description: 'Bed bug elimination service' }
+        { id: 21, title: 'General Pest Control', price: 10, description: 'Complete pest control treatment per sq. ft.', variablePrice: true, priceRange: '₹10 - ₹30 per sq. ft.' },
+        { id: 22, title: 'Cockroach Control', price: 15, description: 'Cockroach control treatment per sq. ft.', variablePrice: true },
+        { id: 23, title: 'Termite Control', price: 20, description: 'Termite inspection and control per sq. ft.', variablePrice: true },
+        { id: 24, title: 'Bed Bug Control', price: 25, description: 'Bed bug elimination service per sq. ft.', variablePrice: true }
     ],
     'carpentry': [
-        { id: 25, title: 'Furniture Repair', price: 599, description: 'Furniture repair and restoration' },
-        { id: 26, title: 'Door Work', price: 799, description: 'Door repair and installation' },
-        { id: 27, title: 'Cabinet Work', price: 1499, description: 'Custom cabinet making and repair' },
-        { id: 28, title: 'Wood Polish', price: 899, description: 'Wood polishing and varnishing' }
+        { id: 25, title: 'Furniture Repair', price: 499, description: 'Furniture repair and restoration', variablePrice: true },
+        { id: 26, title: 'Door Work', price: 500, description: 'Door repair and installation', variablePrice: true, priceRange: 'Starting at ₹500' },
+        { id: 27, title: 'Window Work', price: 300, description: 'Window repair and installation', variablePrice: true, priceRange: 'Starting at ₹300' },
+        { id: 28, title: 'Wood Polish', price: 30, description: 'Wood polishing and varnishing per sq. ft.', variablePrice: true, priceRange: '₹30 - ₹400 per sq. ft.' }
     ]
 };
 
@@ -55,7 +52,7 @@ const SERVICE_TITLES = {
     'ac': 'AC Services',
     'plumbing': 'Plumbing Services',
     'electrical': 'Electrical Services',
-    'cleaning': 'Cleaning Services',
+    'cleaning': 'House Cleaning Services',
     'painting': 'Painting Services',
     'pestcontrol': 'Pest Control Services',
     'carpentry': 'Carpentry Services'
@@ -81,6 +78,11 @@ function ServiceDetails() {
         }
     };
 
+    // Check if any selected service has a price range
+    const hasServiceWithRange = selectedServices.some(service => 
+        service.priceRange || (service.variablePrice && service.price > 0)
+    );
+
     const handleProceedToCheckout = () => {
         if (selectedServices.length === 0) {
             alert('Please select at least one service');
@@ -101,7 +103,8 @@ function ServiceDetails() {
                 type: service.title,
                 price: parseFloat(service.price),
                 description: service.description,
-                variablePrice: service.variablePrice || false
+                variablePrice: service.variablePrice || false,
+                priceRange: service.priceRange || null
             });
         });
 
@@ -118,7 +121,8 @@ function ServiceDetails() {
                     type: service.title,
                     price: parseFloat(service.price),
                     description: service.description,
-                    variablePrice: service.variablePrice || false
+                    variablePrice: service.variablePrice || false,
+                    priceRange: service.priceRange || null
                 })),
                 total: total,
                 bookingFee: bookingFee,
@@ -152,7 +156,7 @@ function ServiceDetails() {
                                         <h3 className="text-lg font-medium">{service.title}</h3>
                                         <span className="text-yellow-600 font-semibold">
                                             {service.variablePrice 
-                                                ? `Starting from ₹${service.price}` 
+                                                ? service.priceRange || `Starting from ₹${service.price}` 
                                                 : `₹${service.price}`}
                                         </span>
                                     </div>
@@ -170,11 +174,13 @@ function ServiceDetails() {
                                             {selectedServices.length} service(s) selected
                                         </p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-lg font-semibold">
-                                            Total: ₹{selectedServices.reduce((sum, service) => sum + service.price, 0)}
-                                        </p>
-                                    </div>
+                                    {!hasServiceWithRange && (
+                                        <div className="text-right">
+                                            <p className="text-lg font-semibold">
+                                                Total: ₹{selectedServices.reduce((sum, service) => sum + service.price, 0)}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     onClick={handleProceedToCheckout}
