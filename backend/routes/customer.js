@@ -204,9 +204,13 @@ router.get('/payment-requests', verifyToken, async (req, res) => {
         const customerId = req.user.id;
         console.log('Fetching payment requests for customer:', customerId);
 
-        // Simple query to get all payment requests for this customer
+        // Join with serviceman_profiles to get serviceman name
         const paymentRequests = await pool.query(
-            `SELECT * FROM payment_requests WHERE customer_id = $1 ORDER BY created_at DESC`,
+            `SELECT pr.*, sp.full_name as serviceman_name 
+             FROM payment_requests pr
+             LEFT JOIN serviceman_profiles sp ON pr.serviceman_id = sp.serviceman_id
+             WHERE pr.customer_id = $1 
+             ORDER BY pr.created_at DESC`,
             [customerId]
         );
 

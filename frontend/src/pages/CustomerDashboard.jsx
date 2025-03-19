@@ -511,7 +511,9 @@ function CustomerDashboard() {
                                             {selectedOrder.services && selectedOrder.services.length > 0 && 
                                              selectedOrder.services[0].status === 'pending' 
                                                 ? 'No serviceman assigned yet.' 
-                                                : 'A serviceman has been assigned to your order.'}
+                                                : selectedOrder.services[0].serviceman_name 
+                                                  ? `${selectedOrder.services[0].serviceman_name}` 
+                                                  : 'Serviceman information not available.'}
                                         </p>
                                     </div>
                                 </div>

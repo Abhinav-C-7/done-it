@@ -200,7 +200,7 @@ const Transactions = () => {
                                                                     <h3 className="text-lg font-semibold text-gray-800">{payment.service_type}</h3>
                                                                     <p className="text-sm text-gray-500">Request ID: {payment.request_id}</p>
                                                                     <p className="text-sm text-gray-500">Date: {new Date(payment.created_at).toLocaleDateString()}</p>
-                                                                    <p className="text-sm text-gray-500">Serviceman ID: {payment.serviceman_id}</p>
+                                                                    <p className="text-sm text-gray-500">Serviceman: {payment.serviceman_name || 'Not assigned yet'}</p>
                                                                     {payment.notes && (
                                                                         <p className="text-sm text-gray-500">Notes: {payment.notes}</p>
                                                                     )}
@@ -253,7 +253,7 @@ const Transactions = () => {
                                                         <tr>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serviceman ID</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serviceman</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                                         </tr>
@@ -268,7 +268,7 @@ const Transactions = () => {
                                                                     {transaction.service_type}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                                                    {transaction.serviceman_id}
+                                                                    {transaction.serviceman_name || 'Not available'}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
                                                                     ₹{transaction.amount}
