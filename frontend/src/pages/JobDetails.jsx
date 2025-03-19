@@ -193,10 +193,11 @@ const JobDetails = () => {
       // Update job in state
       setJob(prevJob => ({
         ...prevJob,
-        price: parseFloat(priceToUpdate)
+        price: parseFloat(priceToUpdate),
+        price_finalized: true
       }));
       
-      setSuccessMessage('Job price updated successfully!');
+      setSuccessMessage('Job price finalized successfully!');
       setUpdatingPrice(false);
       setPrice('');
       setShowPriceConfirmation(false);
@@ -548,10 +549,10 @@ const JobDetails = () => {
             </div>
           )}
 
-          {/* Update Price Section - Only show if job is completed */}
-          {job.job_status === 'completed' && (
+          {/* Update Price Section - Only show if job is completed and price is not finalized */}
+          {job.job_status === 'completed' && !job.price_finalized && (
             <div className="border-t border-gray-200 pt-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Set Job Price</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Set Final Job Price</h2>
               
               <form onSubmit={handlePriceUpdate} className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-grow">
@@ -582,9 +583,24 @@ const JobDetails = () => {
                   disabled={updatingPrice}
                   className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                 >
-                  {updatingPrice ? 'Updating...' : 'Update Price'}
+                  {updatingPrice ? 'Finalizing...' : 'Finalize Price'}
                 </button>
               </form>
+              <p className="mt-2 text-sm text-gray-500">
+                Note: Once you finalize the price, it cannot be changed.
+              </p>
+            </div>
+          )}
+
+          {/* Display finalized price if it exists */}
+          {job.price_finalized && job.price && (
+            <div className="border-t border-gray-200 pt-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Final Job Price</h2>
+              <div className="bg-gray-50 p-4 rounded-md">
+                <p className="text-lg font-medium">
+                  ₹{job.price} <span className="text-sm text-gray-500 ml-2">(Finalized)</span>
+                </p>
+              </div>
             </div>
           )}
 

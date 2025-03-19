@@ -422,21 +422,31 @@ router.post('/accept-job/:requestId', verifyToken, async (req, res) => {
 
             const customerId = customerQuery.rows[0].customer_id;
 
-            // Create notification for the customer
-            await pool.query(
-                `INSERT INTO notifications 
-                (user_id, user_type, title, message, type, reference_id, created_at, read) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
-                [
-                    customerId, 
-                    'customer', 
-                    'Service Request Accepted', 
-                    `Your service request has been accepted by ${serviceman.full_name}. Contact: ${serviceman.phone_number}`,
-                    'accepted',
-                    requestId,
-                    false
-                ]
+            // Check if a notification for this job acceptance already exists
+            const existingNotification = await pool.query(
+                `SELECT * FROM notifications 
+                WHERE user_id = $1 AND user_type = $2 AND type = $3 AND reference_id = $4`,
+                [customerId, 'customer', 'accepted', requestId]
             );
+
+            // Only create a notification if one doesn't already exist
+            if (existingNotification.rows.length === 0) {
+                // Create notification for the customer
+                await pool.query(
+                    `INSERT INTO notifications 
+                    (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                    [
+                        customerId, 
+                        'customer', 
+                        'Service Request Accepted', 
+                        `Your service request has been accepted by ${serviceman.full_name}. Contact: ${serviceman.phone_number}`,
+                        'accepted',
+                        requestId,
+                        false
+                    ]
+                );
+            }
 
             // Commit transaction
             await pool.query('COMMIT');
@@ -486,6 +496,7 @@ router.get('/my-jobs', verifyToken, async (req, res) => {
         }
 
         const servicemanId = req.user.id;
+        console.log('Fetching jobs for serviceman ID:', servicemanId);
 
         // Get all jobs assigned to this serviceman
         const myJobs = await pool.query(
@@ -505,11 +516,12 @@ router.get('/my-jobs', verifyToken, async (req, res) => {
                 c.phone_number as customer_phone
             FROM service_requests sr
             JOIN customers c ON sr.customer_id = c.user_id
-            WHERE sr.assigned_serviceman = $1 AND sr.status = 'accepted'
+            WHERE sr.assigned_serviceman = $1
             ORDER BY sr.created_at DESC`,
             [servicemanId]
         );
 
+        console.log('Found jobs count:', myJobs.rows.length);
         res.json(myJobs.rows);
     } catch (err) {
         console.error('Error fetching serviceman jobs:', err);
@@ -574,6 +586,8 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
         const requestId = req.params.requestId;
         const { jobStatus } = req.body;
 
+        console.log(`Updating job ${requestId} status to ${jobStatus} by serviceman ${servicemanId}`);
+
         // Validate job status
         const validStatuses = ['pending', 'on_the_way', 'arrived', 'in_progress', 'completed'];
         if (!validStatuses.includes(jobStatus)) {
@@ -597,11 +611,13 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
 
             const customerId = jobCheck.rows[0].customer_id;
 
-            // Update job status
+            // Update job_status instead of status
             await pool.query(
-                'UPDATE service_requests SET status = $1, updated_at = NOW() WHERE request_id = $2',
+                'UPDATE service_requests SET job_status = $1, updated_at = NOW() WHERE request_id = $2',
                 [jobStatus, requestId]
             );
+
+            console.log(`Successfully updated job_status to ${jobStatus} for request ${requestId}`);
 
             // Get serviceman details for notification
             const servicemanDetails = await pool.query(
@@ -636,28 +652,40 @@ router.put('/job/:requestId/status', verifyToken, async (req, res) => {
                     message = `${serviceman.full_name} has updated the status of your service request.`;
             }
 
-            await pool.query(
-                `INSERT INTO notifications 
-                (user_id, user_type, title, message, type, reference_id, created_at, read) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
-                [
-                    customerId, 
-                    'customer', 
-                    title, 
-                    message,
-                    'status_update',
-                    requestId,
-                    false
-                ]
+            // Check if a notification for this status update already exists
+            const existingNotification = await pool.query(
+                `SELECT * FROM notifications 
+                WHERE user_id = $1 AND user_type = $2 AND type = $3 AND reference_id = $4 AND message = $5`,
+                [customerId, 'customer', 'status_update', requestId, message]
             );
 
+            // Only create a notification if one doesn't already exist
+            if (existingNotification.rows.length === 0) {
+                await pool.query(
+                    `INSERT INTO notifications 
+                    (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                    [
+                        customerId, 
+                        'customer', 
+                        title, 
+                        message,
+                        'status_update',
+                        requestId,
+                        false
+                    ]
+                );
+            }
+
             // Emit socket event for real-time updates
-            req.app.get('io').to(`customer_${customerId}`).emit('jobStatusUpdate', {
-                requestId,
-                jobStatus,
-                message,
-                servicemanName: serviceman.full_name
-            });
+            if (req.app.get('io')) {
+                req.app.get('io').to(`customer_${customerId}`).emit('jobStatusUpdate', {
+                    requestId,
+                    jobStatus,
+                    message,
+                    servicemanName: serviceman.full_name
+                });
+            }
 
             // Commit transaction
             await pool.query('COMMIT');
@@ -686,6 +714,8 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
         const requestId = req.params.requestId;
         const { price } = req.body;
 
+        console.log(`Updating job ${requestId} price to ${price} by serviceman ${servicemanId}`);
+
         // Validate price
         if (!price || isNaN(price) || price <= 0) {
             return res.status(400).json({ message: 'Invalid price. Please provide a positive number.' });
@@ -695,9 +725,9 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
         await pool.query('BEGIN');
 
         try {
-            // Check if the job belongs to this serviceman
+            // Check if the job belongs to this serviceman and if price is already finalized
             const jobCheck = await pool.query(
-                'SELECT customer_id, job_status FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
+                'SELECT customer_id, job_status, price_finalized FROM service_requests WHERE request_id = $1 AND assigned_serviceman = $2',
                 [requestId, servicemanId]
             );
 
@@ -708,6 +738,13 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
 
             const customerId = jobCheck.rows[0].customer_id;
             const jobStatus = jobCheck.rows[0].job_status;
+            const priceFinalized = jobCheck.rows[0].price_finalized;
+
+            // Check if price is already finalized
+            if (priceFinalized) {
+                await pool.query('ROLLBACK');
+                return res.status(400).json({ message: 'Price has already been finalized and cannot be changed' });
+            }
 
             // Only allow price update if job is completed
             if (jobStatus !== 'completed') {
@@ -715,11 +752,13 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
                 return res.status(400).json({ message: 'Can only set price after job is completed' });
             }
 
-            // Update job price
+            // Update job price in the price column and set price_finalized to true
             await pool.query(
-                'UPDATE service_requests SET amount = $1, updated_at = NOW() WHERE request_id = $2',
+                'UPDATE service_requests SET price = $1, price_finalized = true, updated_at = NOW() WHERE request_id = $2',
                 [price, requestId]
             );
+
+            console.log(`Successfully updated price to ${price} and set price_finalized to true for request ${requestId}`);
 
             // Get serviceman details for notification
             const servicemanDetails = await pool.query(
@@ -733,26 +772,45 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
 
             const serviceman = servicemanDetails.rows[0];
 
-            // Create notification for the customer
-            await pool.query(
-                `INSERT INTO notifications 
-                (user_id, user_type, title, message, type, reference_id, created_at, read) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
-                [
-                    customerId, 
-                    'customer', 
-                    'Price Updated', 
-                    `${serviceman.full_name} has set the price for your service request: ₹${price}`,
-                    'price_update',
-                    requestId,
-                    false
-                ]
+            // Check if a notification for this price update already exists
+            const existingNotification = await pool.query(
+                `SELECT * FROM notifications 
+                WHERE user_id = $1 AND user_type = $2 AND type = $3 AND reference_id = $4`,
+                [customerId, 'customer', 'price_update', requestId]
             );
+
+            // Only create a notification if one doesn't already exist
+            if (existingNotification.rows.length === 0) {
+                // Create notification for the customer
+                await pool.query(
+                    `INSERT INTO notifications 
+                    (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                    [
+                        customerId, 
+                        'customer', 
+                        'Price Finalized', 
+                        `${serviceman.full_name} has finalized the price for your service request: ₹${price}`,
+                        'price_update',
+                        requestId,
+                        false
+                    ]
+                );
+            }
+
+            // Emit socket event for real-time updates if available
+            if (req.app.get('io')) {
+                req.app.get('io').to(`customer_${customerId}`).emit('priceUpdate', {
+                    requestId,
+                    price,
+                    servicemanName: serviceman.full_name
+                });
+            }
 
             // Commit transaction
             await pool.query('COMMIT');
 
-            res.json({ message: 'Job price updated successfully', price });
+            res.json({ message: 'Job price finalized successfully', price, priceFinalized: true });
         } catch (err) {
             // Rollback transaction in case of error
             await pool.query('ROLLBACK');
@@ -761,6 +819,26 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('Error updating job price:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Reject a job
+router.post('/reject-job/:requestId', verifyToken, async (req, res) => {
+    try {
+        // Check if user is a serviceman
+        if (req.user.type !== 'serviceman') {
+            return res.status(403).json({ message: 'Access denied. Not a serviceman.' });
+        }
+
+        const { requestId } = req.params;
+        
+        // We don't need to update the service request, just track the rejection in a new table
+        // This could be implemented if needed to track which servicemen rejected which jobs
+        
+        res.json({ message: 'Job rejected' });
+    } catch (err) {
+        console.error('Error rejecting job:', err);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
