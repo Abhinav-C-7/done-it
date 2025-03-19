@@ -412,10 +412,10 @@ function CustomerDashboard() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                ${order.services[0].status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                                order.services[0].status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                                                ${order.services[0].job_status === 'completed' ? 'bg-green-100 text-green-800' : 
+                                                order.services[0].job_status === 'cancelled' ? 'bg-red-100 text-red-800' : 
                                                 'bg-yellow-100 text-yellow-800'}`}>
-                                                {order.services[0].status}
+                                                {order.services[0].job_status || order.services[0].status}
                                             </span>
                                         </td>
                                     </tr>
@@ -465,7 +465,7 @@ function CustomerDashboard() {
                                             </div>
                                             <div>
                                                 <span className="text-gray-500 text-sm">Status:</span>
-                                                <p className="font-medium capitalize">{selectedOrder.services[0]?.status || 'Pending'}</p>
+                                                <p className="font-medium capitalize">{selectedOrder.services[0]?.job_status || selectedOrder.services[0]?.status || 'Pending'}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -484,7 +484,7 @@ function CustomerDashboard() {
                                 <div className="mb-6">
                                     <h3 className="font-semibold mb-2">Progress</h3>
                                     {selectedOrder.services && selectedOrder.services.length > 0 && 
-                                        renderProgressStatus(selectedOrder.services[0].status || 'pending')}
+                                        renderProgressStatus(selectedOrder.services[0].job_status || 'pending')}
                                 </div>
                                 
                                 {/* Services */}

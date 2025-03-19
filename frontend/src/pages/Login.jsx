@@ -41,7 +41,7 @@ function Login() {
             }
         } catch (err) {
             console.error('Login error:', err);
-            setError(err.message || 'Login failed. Please check your credentials.');
+            setError(err.message || 'Invalid email or password. Please try again.');
         } finally {
             setLoading(false);
         }

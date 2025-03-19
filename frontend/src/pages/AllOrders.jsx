@@ -460,7 +460,7 @@ function AllOrders() {
                                     </div>
                                     <div>
                                         <span className="text-gray-500 text-sm">Status:</span>
-                                        <p className="font-medium capitalize">{selectedOrder.services[0]?.status || 'Pending'}</p>
+                                        <p className="font-medium capitalize">{selectedOrder.services[0]?.job_status || selectedOrder.services[0]?.status || 'Pending'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -504,7 +504,7 @@ function AllOrders() {
                             <div className="bg-gray-50 rounded-lg p-4">
                                 <p className="text-gray-700">
                                     {selectedOrder.services && selectedOrder.services.length > 0 && 
-                                     selectedOrder.services[0].status === 'pending' 
+                                     (selectedOrder.services[0].job_status === 'pending' || selectedOrder.services[0].status === 'pending')
                                         ? 'No serviceman assigned yet.' 
                                         : selectedOrder.services[0].serviceman_name 
                                           ? `Your service professional: ${selectedOrder.services[0].serviceman_name}` 
@@ -525,7 +525,7 @@ function AllOrders() {
                             {/* Show payment button if service is completed but payment is pending */}
                             {selectedOrder.services && 
                              selectedOrder.services.length > 0 && 
-                             selectedOrder.services[0].status === 'completed' && 
+                             (selectedOrder.services[0].job_status === 'completed' || selectedOrder.services[0].status === 'completed') && 
                              (!selectedOrder.payment_status || selectedOrder.payment_status !== 'paid') && (
                                 <button
                                     onClick={() => handlePayment(
@@ -541,7 +541,7 @@ function AllOrders() {
                             {/* Show withdraw button if service is still pending */}
                             {selectedOrder.services && 
                              selectedOrder.services.length > 0 && 
-                             selectedOrder.services[0].status === 'pending' && (
+                             (selectedOrder.services[0].job_status === 'pending' || selectedOrder.services[0].status === 'pending') && (
                                 <button
                                     onClick={() => handleWithdraw(selectedOrder.services[0].request_id)}
                                     className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium"
@@ -677,10 +677,10 @@ function AllOrders() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                ${order.services[0].status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                                order.services[0].status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                                                ${order.services[0].job_status === 'completed' ? 'bg-green-100 text-green-800' : 
+                                                order.services[0].job_status === 'cancelled' ? 'bg-red-100 text-red-800' : 
                                                 'bg-yellow-100 text-yellow-800'}`}>
-                                                {order.services[0].status}
+                                                {order.services[0].job_status || order.services[0].status}
                                             </span>
                                         </td>
                                     </tr>

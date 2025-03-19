@@ -106,9 +106,23 @@ export function AuthProvider({ children }) {
             return response.data;
         } catch (err) {
             console.error('Login error:', err);
-            const errorMessage = err.response?.data?.message || 'Failed to login';
+            let errorMessage = 'Invalid email or password. Please try again.';
+            
+            if (err.response) {
+                // Handle specific error codes
+                if (err.response.status === 400) {
+                    errorMessage = 'Invalid email or password. Please try again.';
+                } else if (err.response.status === 401) {
+                    errorMessage = 'Unauthorized access. Please check your credentials.';
+                } else if (err.response.status === 404) {
+                    errorMessage = 'Account not found. Please check your email or register.';
+                } else if (err.response.data?.message) {
+                    errorMessage = err.response.data.message;
+                }
+            }
+            
             setError(errorMessage);
-            throw err;
+            throw new Error(errorMessage);
         } finally {
             setLoading(false);
         }
