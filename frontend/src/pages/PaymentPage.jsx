@@ -16,6 +16,7 @@ const PaymentPage = () => {
     const isServicePayment = paymentDetails?.servicePayment || false;
     const serviceDetails = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
     const paymentAmount = isServicePayment ? serviceDetails?.totalAmount : bookingFee;
+    const paymentRequestId = isServicePayment ? paymentDetails?.paymentRequestId : null;
     
     useEffect(() => {
         // Redirect if no payment details
@@ -173,21 +174,54 @@ const PaymentPage = () => {
             setTimeout(async () => {
                 // Create payment response with unique ID
                 const demoResponse = {
-                    razorpay_order_id: paymentDetails.orderId,
+                    razorpay_order_id: paymentDetails.orderId || paymentDetails.requestId,
                     razorpay_payment_id: 'pay_demo_' + Date.now(),
                 };
                 
                 if (isServicePayment) {
-                    // For service payments, redirect back to transactions page
-                    navigate('/transactions', { 
-                        state: { 
-                            paymentSuccess: true,
-                            paymentDetails: {
-                                ...paymentDetails,
-                                payment_id: demoResponse.razorpay_payment_id
-                            }
-                        } 
-                    });
+                    try {
+                        // For service payments, update the payment status to 'paid'
+                        const token = localStorage.getItem('token');
+                        
+                        if (!token) {
+                            throw new Error('No authentication token found');
+                        }
+                        
+                        // Update payment request status to 'paid'
+                        const response = await fetch(`http://localhost:3000/api/customer/payment-requests/${paymentRequestId}/pay`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                paymentId: demoResponse.razorpay_payment_id
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            console.error('Server error response:', errorData);
+                            throw new Error(errorData.message || 'Failed to update payment status');
+                        }
+                        
+                        const responseData = await response.json();
+                        console.log('Payment status updated:', responseData);
+                        
+                        // Redirect back to transactions page
+                        navigate('/transactions', { 
+                            state: { 
+                                paymentSuccess: true,
+                                paymentDetails: {
+                                    ...paymentDetails,
+                                    payment_id: demoResponse.razorpay_payment_id
+                                }
+                            } 
+                        });
+                    } catch (error) {
+                        console.error('Failed to update payment status:', error);
+                        alert('Payment was successful but we encountered an error updating your payment status. Please contact support.');
+                    }
                 } else {
                     try {
                         // Create service requests in the database

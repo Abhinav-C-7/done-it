@@ -193,4 +193,113 @@ router.put('/profile', verifyToken, async (req, res) => {
     }
 });
 
+// Get pending payment requests for customer
+router.get('/payment-requests', verifyToken, async (req, res) => {
+    try {
+        // Ensure user is a customer
+        if (req.user.type !== 'customer') {
+            return res.status(403).json({ message: 'Access denied. Not a customer.' });
+        }
+
+        const customerId = req.user.id;
+        console.log('Fetching payment requests for customer:', customerId);
+
+        // Simple query to get all payment requests for this customer
+        const paymentRequests = await pool.query(
+            `SELECT * FROM payment_requests WHERE customer_id = $1 ORDER BY created_at DESC`,
+            [customerId]
+        );
+
+        console.log('Payment requests found:', paymentRequests.rows.length);
+        
+        res.json(paymentRequests.rows);
+    } catch (err) {
+        console.error('Error fetching payment requests:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Update payment status
+router.put('/payment-requests/:id/pay', verifyToken, async (req, res) => {
+    try {
+        // Ensure user is a customer
+        if (req.user.type !== 'customer') {
+            return res.status(403).json({ message: 'Access denied. Not a customer.' });
+        }
+
+        const customerId = req.user.id;
+        const paymentRequestId = req.params.id;
+        const { paymentId } = req.body;
+
+        console.log(`Processing payment for request ${paymentRequestId} by customer ${customerId}`);
+
+        // Begin transaction
+        await pool.query('BEGIN');
+
+        try {
+            // Check if the payment request belongs to this customer and is pending
+            const paymentCheck = await pool.query(
+                'SELECT request_id, serviceman_id FROM payment_requests WHERE id = $1 AND customer_id = $2 AND status = $3',
+                [paymentRequestId, customerId, 'pending']
+            );
+
+            if (paymentCheck.rows.length === 0) {
+                await pool.query('ROLLBACK');
+                return res.status(404).json({ message: 'Payment request not found, not owned by you, or already paid' });
+            }
+
+            const requestId = paymentCheck.rows[0].request_id;
+            const servicemanId = paymentCheck.rows[0].serviceman_id;
+
+            // Update payment request status to paid
+            await pool.query(
+                'UPDATE payment_requests SET status = $1, updated_at = NOW() WHERE id = $2',
+                ['paid', paymentRequestId]
+            );
+
+            console.log(`Updated payment request ${paymentRequestId} status to paid`);
+
+            // Get customer details for notification
+            const customerDetails = await pool.query(
+                'SELECT full_name FROM customers WHERE user_id = $1',
+                [customerId]
+            );
+
+            if (customerDetails.rows.length === 0) {
+                throw new Error('Customer profile not found');
+            }
+
+            const customer = customerDetails.rows[0];
+
+            // Create notification for the serviceman
+            await pool.query(
+                `INSERT INTO notifications 
+                (user_id, user_type, title, message, type, reference_id, created_at, read) 
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
+                [
+                    servicemanId, 
+                    'serviceman', 
+                    'Payment Received', 
+                    `${customer.full_name} has completed the payment for your service.`,
+                    'payment',
+                    requestId,
+                    false
+                ]
+            );
+
+            // Commit transaction
+            await pool.query('COMMIT');
+
+            res.json({ message: 'Payment completed successfully', status: 'paid' });
+        } catch (err) {
+            // Rollback transaction in case of error
+            await pool.query('ROLLBACK');
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error processing payment:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;

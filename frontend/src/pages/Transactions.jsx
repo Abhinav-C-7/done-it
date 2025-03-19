@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:3000/api';
 
 const Transactions = () => {
     const [transactions, setTransactions] = useState([]);
@@ -13,72 +16,63 @@ const Transactions = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetchTransactions();
-        fetchPendingPayments();
+        fetchPaymentRequests();
     }, []);
 
-    const fetchTransactions = async () => {
+    const fetchPaymentRequests = async () => {
         try {
             setIsLoading(true);
-            // In a real app, this would be an API call to fetch transaction history
-            // For demo purposes, we'll use mock data
-            const mockTransactions = [
-                {
-                    id: 'trans_1',
-                    date: '2025-03-15',
-                    type: 'Booking Fee',
-                    service: 'AC Repair',
-                    amount: 49,
-                    status: 'Paid',
-                    paymentId: 'pay_demo_123456'
-                },
-                {
-                    id: 'trans_2',
-                    date: '2025-03-10',
-                    type: 'Service Payment',
-                    service: 'Plumbing',
-                    amount: 599,
-                    status: 'Paid',
-                    paymentId: 'pay_demo_789012'
-                }
-            ];
             
-            // Simulate API delay
-            setTimeout(() => {
-                setTransactions(mockTransactions);
+            // Get token from localStorage
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                console.error('No authentication token found');
                 setIsLoading(false);
-            }, 800);
-        } catch (error) {
-            console.error('Error fetching transactions:', error);
-            setIsLoading(false);
-        }
-    };
-
-    const fetchPendingPayments = async () => {
-        try {
-            // In a real app, this would be an API call to fetch pending payments
-            // For demo purposes, we'll use mock data
-            const mockPendingPayments = [
-                {
-                    id: 'req_1',
-                    requestId: 'req_ac_123',
-                    date: '2025-03-16',
-                    service: 'AC Repair',
-                    baseAmount: 799,
-                    additionalCharges: 350,
-                    totalAmount: 1149,
-                    status: 'Pending Payment',
-                    serviceman: 'Rahul K.',
-                    notes: 'Compressor repair required additional parts'
-                }
-            ];
+                return;
+            }
             
-            // Simulate API delay
-            setTimeout(() => {
-                setPendingPayments(mockPendingPayments);
-            }, 800);
+            console.log('Fetching payment requests with token:', token ? 'Token exists' : 'No token');
+            
+            // Fetch all payment requests
+            try {
+                const response = await axios.get(
+                    `${API_BASE_URL}/customer/payment-requests`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }
+                );
+                
+                console.log('Payment requests API response:', response.data);
+                
+                // Filter for paid and pending transactions
+                const paidTransactions = response.data.filter(payment => payment.status === 'paid');
+                const pendingPaymentRequests = response.data.filter(payment => payment.status === 'pending');
+                
+                console.log('Filtered pending payments:', pendingPaymentRequests.length);
+                console.log('Filtered paid transactions:', paidTransactions.length);
+                
+                setTransactions(paidTransactions);
+                setPendingPayments(pendingPaymentRequests);
+            } catch (apiError) {
+                console.error('API Error details:', {
+                    message: apiError.message,
+                    status: apiError.response?.status,
+                    statusText: apiError.response?.statusText,
+                    data: apiError.response?.data
+                });
+                
+                // Set empty arrays to avoid undefined errors
+                setTransactions([]);
+                setPendingPayments([]);
+            }
+            
+            setIsLoading(false);
         } catch (error) {
-            console.error('Error fetching pending payments:', error);
+            console.error('Error fetching payment requests:', error);
+            setIsLoading(false);
         }
     };
 
@@ -87,18 +81,19 @@ const Transactions = () => {
         navigate('/payment', {
             state: {
                 paymentDetails: {
-                    orderId: payment.requestId,
+                    paymentRequestId: payment.id,
+                    requestId: payment.request_id,
                     bookingFee: 0, // Not a booking fee
                     servicePayment: true,
                     orderDetails: {
-                        request_id: payment.requestId,
+                        request_id: payment.request_id,
                         services: [{
-                            type: payment.service,
-                            price: payment.baseAmount,
-                            additionalCharges: payment.additionalCharges,
-                            totalAmount: payment.totalAmount
+                            type: payment.service_type,
+                            price: payment.amount,
+                            additionalCharges: 0,
+                            totalAmount: payment.amount
                         }],
-                        total: payment.totalAmount,
+                        total: payment.amount,
                         payment_method: 'demo'
                     }
                 }
@@ -149,34 +144,28 @@ const Transactions = () => {
                                                     <div key={payment.id} className="p-6 border-b border-gray-100 last:border-b-0">
                                                         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
                                                             <div>
-                                                                <h3 className="text-lg font-semibold text-gray-800">{payment.service}</h3>
-                                                                <p className="text-sm text-gray-500">Request ID: {payment.requestId}</p>
-                                                                <p className="text-sm text-gray-500">Date: {new Date(payment.date).toLocaleDateString()}</p>
-                                                                <p className="text-sm text-gray-500">Serviceman: {payment.serviceman}</p>
+                                                                <div>
+                                                                    <h3 className="text-lg font-semibold text-gray-800">{payment.service_type}</h3>
+                                                                    <p className="text-sm text-gray-500">Request ID: {payment.request_id}</p>
+                                                                    <p className="text-sm text-gray-500">Date: {new Date(payment.created_at).toLocaleDateString()}</p>
+                                                                    <p className="text-sm text-gray-500">Serviceman ID: {payment.serviceman_id}</p>
+                                                                    {payment.notes && (
+                                                                        <p className="text-sm text-gray-500">Notes: {payment.notes}</p>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             <div className="mt-4 md:mt-0">
                                                                 <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                                                                    {payment.status}
+                                                                    {payment.status === 'pending' ? 'Pending Payment' : payment.status}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                         
                                                         <div className="bg-gray-50 p-4 rounded-md mb-4">
-                                                            <h4 className="font-medium text-gray-700 mb-2">Price Breakdown</h4>
-                                                            <div className="flex justify-between text-sm mb-1">
-                                                                <span>Base Service Charge</span>
-                                                                <span>₹{payment.baseAmount}</span>
-                                                            </div>
-                                                            <div className="flex justify-between text-sm mb-1">
-                                                                <span>Additional Charges</span>
-                                                                <span>₹{payment.additionalCharges}</span>
-                                                            </div>
-                                                            {payment.notes && (
-                                                                <p className="text-xs text-gray-500 mt-1 italic">{payment.notes}</p>
-                                                            )}
-                                                            <div className="flex justify-between font-medium text-gray-800 pt-2 mt-2 border-t border-gray-200">
+                                                            <h4 className="font-medium text-gray-700 mb-2">Price</h4>
+                                                            <div className="flex justify-between font-medium text-gray-800">
                                                                 <span>Total Amount</span>
-                                                                <span>₹{payment.totalAmount}</span>
+                                                                <span>₹{payment.amount}</span>
                                                             </div>
                                                         </div>
                                                         
@@ -211,8 +200,8 @@ const Transactions = () => {
                                                     <thead className="bg-gray-50">
                                                         <tr>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serviceman ID</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                                         </tr>
@@ -221,13 +210,13 @@ const Transactions = () => {
                                                         {transactions.map((transaction) => (
                                                             <tr key={transaction.id} className="hover:bg-gray-50">
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                    {new Date(transaction.date).toLocaleDateString()}
+                                                                    {new Date(transaction.created_at).toLocaleDateString()}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                                                    {transaction.type}
+                                                                    {transaction.service_type}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                                                    {transaction.service}
+                                                                    {transaction.serviceman_id}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
                                                                     ₹{transaction.amount}

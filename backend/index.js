@@ -22,6 +22,7 @@ const workerRoutes = require('./routes/workers');
 const ordersRoutes = require('./routes/orders');
 const servicemanRoutes = require('./routes/serviceman');
 const notificationsRoutes = require('./routes/notifications');
+const customerRoutes = require('./routes/customer');
 
 // Middleware
 app.use(cors({
@@ -41,6 +42,7 @@ app.use('/api/workers', workerRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/serviceman', servicemanRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/customer', customerRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
