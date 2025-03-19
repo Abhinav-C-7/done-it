@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Layout from "../components/Layout";
 import Searchbar from "../components/Searchbar";
 import Services from "../components/Services";
@@ -58,12 +59,14 @@ const SERVICE_ROUTES = {
 function Home() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const { notifications, addMockPriceUpdateNotification } = useNotifications();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [popularServices, setPopularServices] = useState([]);
     const [recentBookings, setRecentBookings] = useState([]);
     const [testimonials, setTestimonials] = useState([]);
     const [userLocation, setUserLocation] = useState("");
+    const [priceUpdateNotifications, setPriceUpdateNotifications] = useState([]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -88,6 +91,20 @@ function Home() {
             }
         }
     };
+
+    // Filter price update notifications
+    useEffect(() => {
+        if (notifications && notifications.length > 0) {
+            const priceUpdates = notifications
+                .filter(notification => 
+                    notification.type === 'price_update' && 
+                    !notification.read
+                )
+                .slice(0, 3); // Show only the 3 most recent
+            
+            setPriceUpdateNotifications(priceUpdates);
+        }
+    }, [notifications]);
 
     // Fetch popular services, recent bookings, and testimonials
     useEffect(() => {
@@ -166,6 +183,61 @@ function Home() {
             <div className="min-h-screen bg-gray-50">
                 <div className="ml-16 transition-all duration-300">
                     <div className="max-w-7xl mx-auto px-4 py-6">
+                        {/* Price Update Notifications */}
+                        {user && priceUpdateNotifications.length > 0 && (
+                            <div className="mb-6">
+                                <div className="bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-green-500">
+                                    <div className="p-4">
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0">
+                                                <svg className="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1" />
+                                                </svg>
+                                            </div>
+                                            <div className="ml-3">
+                                                <h3 className="text-lg font-medium text-gray-900">Price Updates</h3>
+                                                <div className="mt-2 text-sm text-gray-500">
+                                                    {priceUpdateNotifications.map((notification, index) => (
+                                                        <div key={notification.id || notification.notification_id} className="mb-2 last:mb-0">
+                                                            <p>{notification.message}</p>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigate('/payment', {
+                                                                        state: {
+                                                                            paymentDetails: {
+                                                                                paymentRequestId: notification.payment_id || `payment_${Date.now()}`,
+                                                                                requestId: notification.reference_id,
+                                                                                bookingFee: 0,
+                                                                                servicePayment: true,
+                                                                                orderDetails: {
+                                                                                    request_id: notification.reference_id,
+                                                                                    services: [{
+                                                                                        type: notification.service_type || 'Service',
+                                                                                        price: notification.amount || 1500,
+                                                                                        additionalCharges: 0,
+                                                                                        totalAmount: notification.amount || 1500
+                                                                                    }],
+                                                                                    total: notification.amount || 1500,
+                                                                                    payment_method: 'demo'
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                }}
+                                                                className="mt-1 text-sm font-medium text-yellow-600 hover:text-yellow-500"
+                                                            >
+                                                                Pay Now
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Hero Section */}
                         <div className='bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-xl shadow-lg p-8 mb-8 text-white'>
                             <div className="flex flex-col items-center justify-center text-center">
@@ -291,26 +363,42 @@ function Home() {
                         )}
 
                         {/* Testimonials Section */}
-                        <div className="mb-12">
-                            <h2 className="text-2xl font-semibold mb-6">What Our Customers Say</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">What Our Customers Say</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {testimonials.map((testimonial) => (
-                                    <div key={testimonial.id} className="bg-white p-6 rounded-lg shadow-md">
+                                    <div key={testimonial.id} className="bg-white rounded-lg shadow-md p-6">
                                         <div className="flex items-center mb-4">
-                                            {renderStars(testimonial.rating)}
+                                            <div className="flex">
+                                                {renderStars(testimonial.rating)}
+                                            </div>
+                                            <span className="ml-2 text-gray-600">{testimonial.rating}/5</span>
                                         </div>
-                                        <p className="text-gray-700 mb-4">"{testimonial.comment}"</p>
+                                        <p className="text-gray-600 mb-4">"{testimonial.comment}"</p>
                                         <div className="flex items-center justify-between">
-                                            <p className="font-medium">{testimonial.name}</p>
-                                            <p className="text-sm text-gray-500">{testimonial.service}</p>
+                                            <span className="font-medium text-gray-800">{testimonial.name}</span>
+                                            <span className="text-sm text-gray-500">{testimonial.service}</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                    </div>
 
-                    <Navbar posticon={post} homeicon={homefull} profileicon={profile} />
+                        {/* Test Button for Price Update Notification (only visible in development) */}
+                        {user && (
+                            <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+                                <h3 className="text-lg font-medium text-gray-800 mb-2">Development Testing</h3>
+                                <button
+                                    onClick={() => {
+                                        addMockPriceUpdateNotification(1500, 'Test Serviceman', '123');
+                                    }}
+                                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
+                                >
+                                    Test Price Update Notification
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </Layout>

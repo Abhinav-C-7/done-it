@@ -762,10 +762,10 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
             console.log(`Successfully updated price to ${price} and set price_finalized to true for request ${requestId}`);
 
             // Create an entry in the payment_requests table
-            await pool.query(
+            const paymentInsertResult = await pool.query(
                 `INSERT INTO payment_requests 
                 (request_id, customer_id, serviceman_id, amount, service_type, status, created_at) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id`,
                 [
                     requestId, 
                     customerId, 
@@ -776,7 +776,8 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
                 ]
             );
 
-            console.log(`Created payment request for request_id ${requestId} with amount ${price}`);
+            const paymentId = paymentInsertResult.rows[0].id;
+            console.log(`Created payment request for request_id ${requestId} with amount ${price} and payment ID ${paymentId}`);
 
             // Get serviceman details for notification
             const servicemanDetails = await pool.query(
@@ -821,7 +822,9 @@ router.put('/job/:requestId/price', verifyToken, async (req, res) => {
                 req.app.get('io').to(`customer_${customerId}`).emit('priceUpdate', {
                     requestId,
                     price,
-                    servicemanName: serviceman.full_name
+                    servicemanName: serviceman.full_name,
+                    paymentId,
+                    serviceType
                 });
             }
 
