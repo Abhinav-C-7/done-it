@@ -64,11 +64,14 @@ export function AuthProvider({ children }) {
             setLoading(true);
             setError(null);
 
-            // Determine if the user is a serviceman or customer
+            // Determine user type based on email
             const isServiceman = email.includes('@serviceman.doneit.com');
-            const endpoint = isServiceman ? '/api/auth/serviceman/login' : '/api/auth/login';
+            const isAdmin = email.includes('@admin.doneit.com') || email === 'admin@doneit.com';
+            
+            // Use the same endpoint for all user types - the backend will handle the differentiation
+            const endpoint = '/api/auth/login';
 
-            console.log(`Attempting login with ${isServiceman ? 'serviceman' : 'customer'} endpoint: ${endpoint}`);
+            console.log(`Attempting login with ${isAdmin ? 'admin' : (isServiceman ? 'serviceman' : 'customer')} email: ${email}`);
 
             const response = await axios.post(`${API_BASE_URL.replace('/api', '')}${endpoint}`, {
                 email,
@@ -80,24 +83,18 @@ export function AuthProvider({ children }) {
             // Handle different response structures
             let userData, token;
             
-            if (isServiceman) {
-                // Handle serviceman response
-                token = response.data.token;
-                userData = response.data.user;
-            } else {
-                // Handle customer response
-                token = response.data.token;
-                userData = response.data.user;
-            }
+            // Extract token and user data from response
+            token = response.data.token;
+            userData = response.data.user || response.data.serviceman || {};
             
             // Store token and user data
             localStorage.setItem('token', token);
-            localStorage.setItem('userType', userData.type || (isServiceman ? 'serviceman' : 'customer'));
+            localStorage.setItem('userType', userData.type || (isAdmin ? 'admin' : (isServiceman ? 'serviceman' : 'customer')));
             
             const userWithType = { 
                 ...userData, 
                 token,
-                type: userData.type || (isServiceman ? 'serviceman' : 'customer')
+                type: userData.type || (isAdmin ? 'admin' : (isServiceman ? 'serviceman' : 'customer'))
             };
             
             setUser(userWithType);

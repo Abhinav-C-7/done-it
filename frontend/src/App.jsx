@@ -31,6 +31,7 @@ import JobDetails from './pages/JobDetails';
 import AvailableJobs from './components/AvailableJobs';
 import MyJobs from './components/MyJobs';
 import Transactions from './pages/Transactions';
+import AdminWelcome from './pages/AdminWelcome';
 
 // PrivateRoute component
 function PrivateRoute({ children, userType }) {
@@ -53,17 +54,31 @@ function PrivateRoute({ children, userType }) {
   const userIsServiceman = user.type === 'serviceman';
   const userIsWorker = user.type === 'worker';
   const userIsCustomer = user.type === 'customer';
+  const userIsAdmin = user.type === 'admin';
 
   // Redirect based on user type and requested route type
+  if (userType === 'admin' && !userIsAdmin) {
+    return <Navigate to="/" />;
+  }
+
   if (userType === 'customer' && !userIsCustomer) {
+    if (userIsAdmin) {
+      return <Navigate to="/admin-welcome" />;
+    }
     return userIsServiceman ? <Navigate to="/serviceman/dashboard" /> : <Navigate to="/worker/dashboard" />;
   }
 
   if (userType === 'serviceman' && !userIsServiceman) {
+    if (userIsAdmin) {
+      return <Navigate to="/admin-welcome" />;
+    }
     return userIsCustomer ? <Navigate to="/" /> : <Navigate to="/worker/dashboard" />;
   }
 
   if (userType === 'worker' && !userIsWorker) {
+    if (userIsAdmin) {
+      return <Navigate to="/admin-welcome" />;
+    }
     return userIsCustomer ? <Navigate to="/" /> : <Navigate to="/serviceman/dashboard" />;
   }
 
@@ -88,6 +103,7 @@ function App() {
                     <Route path="/register" element={<Register />} />
                     <Route path="/serviceman-register" element={<ServicemanRegister />} />
                     <Route path="/worker/welcome" element={<WorkerWelcome />} />
+                    <Route path="/admin-welcome" element={<AdminWelcome />} />
                     <Route path="/services" element={<Services />} />
                     <Route path="/services/:serviceType" element={<ServiceDetails />} />
                     <Route path="/service-request" element={<ServiceRequest />} />

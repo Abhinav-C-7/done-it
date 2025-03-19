@@ -66,10 +66,27 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        console.log('Login attempt:', { email, isPassword: !!password });
+        
         const isServiceman = email.endsWith('@serviceman.doneit.com');
+        const isAdmin = email.endsWith('@admin.doneit.com') || email === 'admin@doneit.com';
+        
+        console.log('User type detection:', { isServiceman, isAdmin });
 
         let user;
-        if (isServiceman) {
+        if (isAdmin) {
+            // Check admins table
+            console.log('Checking admin table for:', email);
+            const result = await pool.query(
+                'SELECT * FROM admins WHERE email = $1',
+                [email]
+            );
+            console.log('Admin query result:', { found: result.rows.length > 0 });
+            if (result.rows.length > 0) {
+                user = result.rows[0];
+                console.log('Admin found:', { adminId: user.admin_id, email: user.email });
+            }
+        } else if (isServiceman) {
             // Check serviceman_profiles table
             const result = await pool.query(
                 'SELECT * FROM serviceman_profiles WHERE email = $1',
@@ -102,29 +119,46 @@ router.post('/login', async (req, res) => {
                     });
                 }
             }
+            console.log('User not found for email:', email);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
-
+        
         // Check password
+        console.log('Validating password for user:', { email: user.email });
         const validPassword = await bcrypt.compare(password, user.password);
+        console.log('Password validation result:', validPassword);
+        
         if (!validPassword) {
+            console.log('Invalid password for user:', { email: user.email });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         // Create token with user type
         const token = jwt.sign(
             { 
-                id: isServiceman ? user.serviceman_id : user.user_id,
-                type: isServiceman ? 'serviceman' : 'customer'
+                id: isAdmin ? user.admin_id : (isServiceman ? user.serviceman_id : user.user_id),
+                type: isAdmin ? 'admin' : (isServiceman ? 'serviceman' : 'customer')
             },
             process.env.JWT_SECRET || 'your_jwt_secret'
         );
 
         // Send response based on user type
-        if (isServiceman) {
+        if (isAdmin) {
             res.json({
                 token,
-                serviceman: {
+                user: {
+                    id: user.admin_id,
+                    email: user.email,
+                    fullName: user.full_name,
+                    phone: user.phone_number,
+                    role: user.role,
+                    type: 'admin'
+                }
+            });
+        } else if (isServiceman) {
+            res.json({
+                token,
+                user: {
                     id: user.serviceman_id,
                     email: user.email,
                     fullName: user.full_name,
@@ -162,7 +196,28 @@ router.get('/verify', async (req, res) => {
         console.log('Decoded token in /auth/verify:', decoded);
         
         // Check user type and get profile
-        if (decoded.type === 'serviceman') {
+        if (decoded.type === 'admin') {
+            console.log('User is an admin');
+            // Get admin profile
+            const admin = await pool.query(
+                'SELECT * FROM admins WHERE admin_id = $1',
+                [decoded.id]
+            );
+            
+            if (admin.rows.length === 0) {
+                return res.status(404).json({ message: 'Admin profile not found' });
+            }
+            
+            // Remove password from response
+            const { password, ...adminData } = admin.rows[0];
+            
+            return res.json({
+                user: {
+                    ...adminData,
+                    type: 'admin'
+                }
+            });
+        } else if (decoded.type === 'serviceman') {
             console.log('User is a serviceman');
             // Get serviceman profile
             const serviceman = await pool.query(

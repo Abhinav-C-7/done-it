@@ -27,8 +27,12 @@ function Login() {
             
             // Determine user type and redirect accordingly
             const isServiceman = email.includes('@serviceman.doneit.com');
+            const isAdmin = email.includes('@admin.doneit.com') || email === 'admin@doneit.com';
             
-            if (isServiceman) {
+            if (isAdmin) {
+                console.log('Redirecting admin to welcome page');
+                navigate('/admin-welcome');
+            } else if (isServiceman) {
                 console.log('Redirecting serviceman to dashboard');
                 navigate('/serviceman-dashboard');
             } else {
@@ -119,6 +123,9 @@ function Login() {
                                             >
                                                 Register as a Serviceman
                                             </Link>
+                                        </div>
+                                        <div className="mt-2 text-sm text-gray-500">
+                                            Admin login: Use your admin email (@admin.doneit.com)
                                         </div>
                                     </div>
                                 </div>
