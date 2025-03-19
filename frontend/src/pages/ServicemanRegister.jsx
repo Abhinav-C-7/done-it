@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 function ServicemanRegister() {
     const [formData, setFormData] = useState({
@@ -12,11 +14,19 @@ function ServicemanRegister() {
         city: '',
         pincode: '',
         skills: [],
-        id_proof_path: ''
+        id_proof_path: '',
+        current_location: null
     });
     const [services, setServices] = useState([]);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [showMap, setShowMap] = useState(false);
+    const [map, setMap] = useState(null);
+    const [marker, setMarker] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [selectedLocation, setSelectedLocation] = useState(null);
+    const mapRef = useRef(null);
     const navigate = useNavigate();
     const { registerServiceman } = useAuth();
 
@@ -44,6 +54,139 @@ function ServicemanRegister() {
             });
     }, []);
 
+    const validateEmail = (email) => {
+        const regex = /@serviceman\.doneit\.com$/;
+        return regex.test(email);
+    };
+
+    const validatePincode = (pincode) => {
+        const regex = /^\d{6}$/;
+        return regex.test(pincode);
+    };
+
+    const searchLocation = async (query) => {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            setSuggestions(data);
+        } catch (error) {
+            console.error('Error searching location:', error);
+        }
+    };
+
+    const handleSearchChange = (e) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+        
+        if (query.length > 2) {
+            searchLocation(query);
+        } else {
+            setSuggestions([]);
+        }
+    };
+
+    const handleLocationSelect = (location) => {
+        setSelectedLocation({
+            lat: parseFloat(location.lat),
+            lng: parseFloat(location.lon),
+            address: location.display_name
+        });
+        setSearchQuery(location.display_name);
+        setSuggestions([]);
+        
+        if (map) {
+            map.setView([location.lat, location.lon], 16);
+            if (marker) {
+                marker.setLatLng([location.lat, location.lon]);
+            }
+        }
+    };
+
+    const updateLocationData = (lat, lng, address) => {
+        // Format for PostgreSQL point type: (x,y)
+        setFormData(prev => ({
+            ...prev,
+            current_location: `(${lat},${lng})`
+        }));
+        setSelectedLocation({
+            lat,
+            lng,
+            address
+        });
+    };
+
+    const handleMapClick = async (e) => {
+        const { lat, lng } = e.latlng;
+        
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await response.json();
+            const address = data.display_name;
+            
+            updateLocationData(lat, lng, address);
+            setSearchQuery(address);
+            
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            }
+        } catch (error) {
+            console.error('Error getting address:', error);
+        }
+    };
+
+    const initMap = () => {
+        if (!mapRef.current) return;
+        
+        // Default to a location in India if none selected
+        const defaultLat = selectedLocation?.lat || 20.5937;
+        const defaultLng = selectedLocation?.lng || 78.9629;
+        
+        const mapInstance = L.map(mapRef.current).setView([defaultLat, defaultLng], 5);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: ' OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(mapInstance);
+        
+        const markerInstance = L.marker([defaultLat, defaultLng], { 
+            draggable: true,
+            icon: new L.Icon.Default()
+        }).addTo(mapInstance);
+        
+        markerInstance.on('dragend', async function(e) {
+            const position = e.target.getLatLng();
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.lat}&lon=${position.lng}`);
+                const data = await response.json();
+                const address = data.display_name;
+                
+                updateLocationData(position.lat, position.lng, address);
+                setSearchQuery(address);
+            } catch (error) {
+                console.error('Error getting address:', error);
+            }
+        });
+        
+        mapInstance.on('click', handleMapClick);
+        
+        setMap(mapInstance);
+        setMarker(markerInstance);
+    };
+
+    useEffect(() => {
+        if (showMap && !map && mapRef.current) {
+            initMap();
+        }
+        
+        return () => {
+            if (map) {
+                map.remove();
+                setMap(null);
+                setMarker(null);
+            }
+        };
+    }, [showMap]);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -61,16 +204,6 @@ function ServicemanRegister() {
                 id_proof_path: file.name
             }));
         }
-    };
-
-    const validateEmail = (email) => {
-        const regex = /@serviceman\.doneit\.com$/;
-        return regex.test(email);
-    };
-
-    const validatePincode = (pincode) => {
-        const regex = /^\d{6}$/;
-        return regex.test(pincode);
     };
 
     const handleSubmit = async (e) => {
@@ -96,7 +229,14 @@ function ServicemanRegister() {
             return;
         }
 
+        // Validate location selection
+        if (!formData.current_location) {
+            setError('Please select your preferred work location');
+            return;
+        }
+
         try {
+            console.log('Submitting registration with current_location:', formData.current_location);
             const response = await registerServiceman(formData);
             if (response.success) {
                 setSuccess('Registration submitted successfully! Pending admin approval.');
@@ -105,6 +245,7 @@ function ServicemanRegister() {
                 }, 3000);
             }
         } catch (err) {
+            console.error('Registration error:', err);
             setError(err.message || 'Registration failed');
         }
     };
@@ -366,6 +507,71 @@ function ServicemanRegister() {
                                     <p className="text-sm text-gray-500 mt-1">Upload Aadhar/PAN/Driving License (PDF/JPG/PNG)</p>
                                 </div>
 
+                                {/* Preferred Work Location */}
+                                <div>
+                                    <label className="block text-gray-700 text-sm font-semibold mb-2">
+                                        Preferred Work Location *
+                                    </label>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={handleSearchChange}
+                                            placeholder="Search for a location"
+                                            className="flex-grow px-4 py-3 rounded-l-xl border border-gray-200 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowMap(true)}
+                                            className="px-4 py-3 bg-yellow-400 text-white rounded-r-xl hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Location Suggestions */}
+                                    {suggestions.length > 0 && (
+                                        <div className="mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {suggestions.map((suggestion, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="px-4 py-2 hover:bg-yellow-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                    onClick={() => handleLocationSelect(suggestion)}
+                                                >
+                                                    {suggestion.display_name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {formData.current_location && (
+                                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                                            <div className="flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                                </svg>
+                                                Location selected
+                                            </div>
+                                            {selectedLocation && (
+                                                <p className="mt-1 ml-7 text-xs text-green-600">
+                                                    {selectedLocation.address}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {!formData.current_location && (
+                                        <p className="text-sm text-red-500 mt-1 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            Please select your preferred work location
+                                        </p>
+                                    )}
+                                </div>
+
                                 <button
                                     type="submit"
                                     className="w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
@@ -377,6 +583,87 @@ function ServicemanRegister() {
                     </div>
                 </div>
             </div>
+            
+            {/* Map Modal */}
+            {showMap && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden">
+                        <div className="p-4 bg-yellow-50 border-b border-yellow-100 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-yellow-800">Select Your Preferred Work Location</h3>
+                            <button 
+                                onClick={() => setShowMap(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div className="p-4">
+                            <div className="flex mb-4">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={handleSearchChange}
+                                    placeholder="Search for a location"
+                                    className="flex-grow px-4 py-2 rounded-l-lg border border-gray-300 focus:border-yellow-400 focus:ring focus:ring-yellow-200 focus:ring-opacity-50"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => searchLocation(searchQuery)}
+                                    className="px-4 py-2 bg-yellow-400 text-white rounded-r-lg hover:bg-yellow-500 focus:outline-none"
+                                >
+                                    Search
+                                </button>
+                            </div>
+                            
+                            {suggestions.length > 0 && (
+                                <div className="mb-4 bg-white border border-gray-200 rounded-lg shadow-sm max-h-40 overflow-y-auto">
+                                    {suggestions.map((suggestion, index) => (
+                                        <div
+                                            key={index}
+                                            className="px-4 py-2 hover:bg-yellow-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                            onClick={() => handleLocationSelect(suggestion)}
+                                        >
+                                            {suggestion.display_name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            <div ref={mapRef} style={{ height: '400px', width: '100%' }} className="rounded-lg border border-gray-300"></div>
+                            
+                            <div className="mt-4 text-sm text-gray-600">
+                                <p>Click on the map or drag the marker to select your preferred work location.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowMap(false)}
+                                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg mr-2 hover:bg-gray-300 focus:outline-none"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (selectedLocation) {
+                                        updateLocationData(selectedLocation.lat, selectedLocation.lng, selectedLocation.address);
+                                        setShowMap(false);
+                                    }
+                                }}
+                                className="px-6 py-2 bg-yellow-400 text-white rounded-lg hover:bg-yellow-500 focus:outline-none"
+                                disabled={!selectedLocation}
+                            >
+                                Confirm Location
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

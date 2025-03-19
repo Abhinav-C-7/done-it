@@ -292,11 +292,12 @@ router.post('/serviceman/register', async (req, res) => {
             city,
             pincode,
             skills,
-            id_proof_path 
+            id_proof_path,
+            current_location
         } = req.body;
         
         // Validation
-        if (!email || !password || !full_name || !phone_number || !address || !city || !pincode || !skills || !id_proof_path) {
+        if (!email || !password || !full_name || !phone_number || !address || !city || !pincode || !skills || !id_proof_path || !current_location) {
             return res.status(400).json({ 
                 message: 'All fields are required'
             });
@@ -349,9 +350,12 @@ router.post('/serviceman/register', async (req, res) => {
                 pincode,
                 skills,
                 id_proof_path,
-                status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-            RETURNING *`,
+                status,
+                current_location
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+                POINT($11)
+            ) RETURNING *`,
             [
                 email, 
                 hashedPassword, 
@@ -362,7 +366,8 @@ router.post('/serviceman/register', async (req, res) => {
                 pincode,
                 skills,
                 id_proof_path,
-                'pending'
+                'pending',
+                current_location
             ]
         );
         
@@ -378,6 +383,9 @@ router.post('/serviceman/register', async (req, res) => {
 
     } catch (err) {
         console.error('Serviceman registration error:', err);
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        console.error('Request body:', req.body);
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });

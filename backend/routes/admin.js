@@ -25,7 +25,9 @@ const authenticateAdmin = async (req, res, next) => {
         next();
     } catch (err) {
         console.error('Admin authentication error:', err);
-        res.status(401).json({ message: 'Invalid token' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(401).json({ message: 'Invalid token', error: err.message });
     }
 };
 
@@ -63,7 +65,9 @@ router.get('/dashboard', async (req, res) => {
         });
     } catch (err) {
         console.error('Error fetching admin dashboard data:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -77,7 +81,9 @@ router.get('/customers', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching customers:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -91,7 +97,9 @@ router.get('/servicemen', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching servicemen:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -108,7 +116,9 @@ router.get('/service-requests', async (req, res) => {
         res.json(requests.rows);
     } catch (err) {
         console.error('Error fetching service requests:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -131,7 +141,9 @@ router.get('/reviews', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching reviews:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -146,7 +158,9 @@ router.get('/applications', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching serviceman applications:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -176,7 +190,9 @@ router.get('/applications/:id/id-proof', async (req, res) => {
         res.sendFile(idProofPath, { root: process.cwd() });
     } catch (err) {
         console.error('Error fetching ID proof:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -201,13 +217,19 @@ router.post('/applications/:id/approve', async (req, res) => {
         
         const applicant = registration.rows[0];
         
+        // Log the applicant data for debugging
+        console.log('Applicant data:', applicant);
+        console.log('Current location from registration:', applicant.current_location);
+        
         // Create serviceman profile
         const newServiceman = await pool.query(
             `INSERT INTO serviceman_profiles (
                 email, password, full_name, phone_number, address, city, pincode, skills,
                 rating, total_jobs, completed_jobs, cancelled_jobs, current_status,
                 is_active, profile_picture
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+            ) RETURNING *`,
             [
                 applicant.email,
                 applicant.password,
@@ -227,6 +249,20 @@ router.post('/applications/:id/approve', async (req, res) => {
             ]
         );
         
+        // Update the current_location separately
+        if (applicant.current_location) {
+            // Convert the point object to the correct PostgreSQL point format
+            const pointStr = `(${applicant.current_location.x},${applicant.current_location.y})`;
+            console.log('Formatted point string for PostgreSQL:', pointStr);
+            
+            await pool.query(
+                `UPDATE serviceman_profiles 
+                 SET current_location = $1::point
+                 WHERE email = $2`,
+                [pointStr, applicant.email]
+            );
+        }
+        
         // Update application status
         await pool.query(
             'UPDATE serviceman_registrations SET status = $1 WHERE registration_id = $2',
@@ -243,7 +279,9 @@ router.post('/applications/:id/approve', async (req, res) => {
     } catch (err) {
         await pool.query('ROLLBACK');
         console.error('Error approving application:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
@@ -269,7 +307,9 @@ router.post('/applications/:id/reject', async (req, res) => {
         });
     } catch (err) {
         console.error('Error rejecting application:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error details:', err.message);
+        console.error('Error stack:', err.stack);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
 
