@@ -33,6 +33,7 @@ import AvailableJobs from './components/AvailableJobs';
 import MyJobs from './components/MyJobs';
 import Transactions from './pages/Transactions';
 import AdminWelcome from './pages/AdminWelcome';
+import VerifyEmail from './pages/VerifyEmail';
 
 // PrivateRoute component
 function PrivateRoute({ children, userType }) {
@@ -102,6 +103,7 @@ function App() {
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/serviceman-register" element={<ServicemanRegister />} />
                     <Route path="/serviceman-register-success" element={<ServicemanRegisterSuccess />} />
                     <Route path="/worker/welcome" element={<WorkerWelcome />} />

@@ -24,6 +24,7 @@ const servicemanRoutes = require('./routes/serviceman');
 const notificationsRoutes = require('./routes/notifications');
 const customerRoutes = require('./routes/customer');
 const adminRoutes = require('./routes/admin');
+const verificationRoutes = require('./routes/verification');
 
 // Middleware
 app.use(cors({
@@ -45,6 +46,7 @@ app.use('/api/serviceman', servicemanRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/verification', verificationRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {

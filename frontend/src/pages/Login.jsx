@@ -22,12 +22,14 @@ function Login() {
         
         try {
             console.log('Attempting to login with:', { email });
-            const response = await login(email, password);
-            console.log('Login response received:', response);
             
-            // Determine user type and redirect accordingly
+            // Determine user type
             const isServiceman = email.includes('@serviceman.doneit.com');
             const isAdmin = email.includes('@admin.doneit.com') || email === 'admin@doneit.com';
+            
+            // Login with backend directly
+            const response = await login(email, password);
+            console.log('Login response received:', response);
             
             if (isAdmin) {
                 console.log('Redirecting admin to welcome page');
@@ -100,36 +102,30 @@ function Login() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col space-y-4">
+                                <div>
                                     <button
                                         type="submit"
+                                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors duration-200"
                                         disabled={loading}
-                                        className={`w-full px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-semibold rounded-xl hover:from-yellow-500 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 transform transition-all duration-200 ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
                                     >
-                                        Sign In
+                                        {loading ? 'Signing in...' : 'Sign In'}
                                     </button>
-                                    
-                                    <div className="text-center">
-                                        <Link
-                                            to="/register"
-                                            className="text-yellow-600 hover:text-yellow-700 font-medium"
-                                        >
-                                            Don't have an account? Register here
-                                        </Link>
-                                        <div className="mt-2">
-                                            <Link
-                                                to="/serviceman-register"
-                                                className="text-blue-600 hover:text-blue-700 font-medium"
-                                            >
-                                                Register as a Serviceman
-                                            </Link>
-                                        </div>
-                                        <div className="mt-2 text-sm text-gray-500">
-                                            Admin login: Use your admin email (@admin.doneit.com)
-                                        </div>
-                                    </div>
                                 </div>
                             </form>
+
+                            <div className="mt-6 text-center">
+                                <p className="text-gray-600 text-sm">
+                                    Don't have an account?{' '}
+                                    <Link to="/register" className="text-yellow-600 hover:text-yellow-700 font-medium">
+                                        Create one now
+                                    </Link>
+                                </p>
+                                <div className="mt-2">
+                                    <Link to="/forgot-password" className="text-yellow-600 hover:text-yellow-700 text-sm">
+                                        Forgot your password?
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

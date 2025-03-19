@@ -313,4 +313,31 @@ router.post('/applications/:id/reject', async (req, res) => {
     }
 });
 
+// Endpoint to check and clean orphaned accounts
+router.post('/check-orphaned-account', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    // Check if email exists in customers table
+    const query = 'SELECT user_id FROM customers WHERE email = $1';
+    const result = await pool.query(query, [email]);
+    
+    const existsInDatabase = result.rows.length > 0;
+    
+    res.status(200).json({ 
+      existsInDatabase,
+      message: existsInDatabase 
+        ? 'Email exists in database' 
+        : 'Email does not exist in database (may be orphaned in Firebase)'
+    });
+  } catch (error) {
+    console.error('Error checking orphaned account:', error);
+    res.status(500).json({ message: 'Failed to check orphaned account', error: error.message });
+  }
+});
+
 module.exports = router;

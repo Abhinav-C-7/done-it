@@ -156,20 +156,6 @@ export function AuthProvider({ children }) {
         setShowLogoutConfirm(false);
     };
 
-    const register = async (formData) => {
-        try {
-            console.log('Sending registration data:', formData);
-            const response = await axios.post(`${API_BASE_URL.replace('/api', '')}/api/auth/register`, formData);
-            return response.data;
-        } catch (error) {
-            console.error('Registration error details:', error.response?.data);
-            if (error.response?.data?.message) {
-                throw new Error(error.response.data.message);
-            }
-            throw new Error('Failed to register. Please try again.');
-        }
-    };
-
     const registerServiceman = async (formData) => {
         try {
             const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/auth/serviceman/register`, {
@@ -188,9 +174,10 @@ export function AuthProvider({ children }) {
 
             return {
                 success: true,
-                ...data
+                data
             };
         } catch (error) {
+            console.error('Serviceman registration error:', error);
             throw error;
         }
     };
@@ -201,7 +188,6 @@ export function AuthProvider({ children }) {
         error,
         login,
         logout,
-        register,
         registerServiceman,
         token: user?.token,
         loggingOut,
