@@ -302,4 +302,73 @@ router.put('/payment-requests/:id/pay', verifyToken, async (req, res) => {
     }
 });
 
+// Submit a review
+router.post('/reviews', verifyToken, async (req, res) => {
+    try {
+        // Ensure user is a customer
+        if (req.user.type !== 'customer') {
+            return res.status(403).json({ message: 'Access denied. Not a customer.' });
+        }
+
+        const customerId = req.user.id;
+        const { service_request_id, serviceman_id, rating, comment } = req.body;
+
+        console.log(`Customer ${customerId} submitting review for request ${service_request_id}`);
+        console.log('Review data received:', req.body);
+
+        // Validate input
+        if (!service_request_id || !rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ 
+                message: 'Invalid review data. Service request ID and rating (between 1-5) are required.',
+                received: { service_request_id, rating }
+            });
+        }
+
+        // If serviceman_id is not provided, look it up from the service request
+        let finalServicemanId = serviceman_id;
+        if (!finalServicemanId) {
+            try {
+                const serviceRequestResult = await pool.query(
+                    'SELECT assigned_serviceman FROM service_requests WHERE request_id = $1',
+                    [service_request_id]
+                );
+                
+                if (serviceRequestResult.rows.length === 0) {
+                    return res.status(404).json({ message: 'Service request not found' });
+                }
+                
+                finalServicemanId = serviceRequestResult.rows[0].assigned_serviceman;
+                
+                if (!finalServicemanId) {
+                    return res.status(400).json({ 
+                        message: 'No serviceman assigned to this service request. Cannot submit review.' 
+                    });
+                }
+                
+                console.log(`Retrieved serviceman_id ${finalServicemanId} from service request ${service_request_id}`);
+            } catch (err) {
+                console.error('Error retrieving serviceman_id:', err);
+                return res.status(500).json({ 
+                    message: 'Error retrieving serviceman information',
+                    error: err.message 
+                });
+            }
+        }
+
+        // Insert review
+        await pool.query(
+            `INSERT INTO reviews (service_request_id, customer_id, serviceman_id, rating, comment, created_at) 
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [service_request_id, customerId, finalServicemanId, rating, comment || '']
+        );
+
+        console.log(`Review submitted successfully for request ${service_request_id}`);
+        
+        res.json({ message: 'Review submitted successfully. Thank you for choosing Done-it!' });
+    } catch (err) {
+        console.error('Error submitting review:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
 module.exports = router;
