@@ -372,7 +372,7 @@ router.delete('/withdraw/:requestId', verifyToken, async (req, res) => {
 
             // Update the request status to 'cancelled'
             await client.query(
-                'UPDATE service_requests SET status = $1, updated_at = NOW() WHERE request_id = $2',
+                'UPDATE service_requests SET status = $1, job_status = $1, updated_at = NOW() WHERE request_id = $2',
                 ['cancelled', requestId]
             );
 

@@ -89,7 +89,6 @@ function CustomerDashboard() {
                 
                 // Convert to array
                 const transformedOrders = Object.values(groupedOrders);
-                console.log('Transformed orders:', transformedOrders.length);
                 
                 setOrders(transformedOrders);
                 
@@ -223,7 +222,7 @@ function CustomerDashboard() {
             const updatedOrders = orders.map(order => {
                 const updatedServices = order.services.map(service => {
                     if (service.request_id === requestId) {
-                        return { ...service, status: 'cancelled' };
+                        return { ...service, status: 'cancelled', job_status: 'cancelled' };
                     }
                     return service;
                 });
@@ -240,7 +239,7 @@ function CustomerDashboard() {
             if (selectedOrder) {
                 const updatedServices = selectedOrder.services.map(service => {
                     if (service.request_id === requestId) {
-                        return { ...service, status: 'cancelled' };
+                        return { ...service, status: 'cancelled', job_status: 'cancelled' };
                     }
                     return service;
                 });
@@ -483,8 +482,20 @@ function CustomerDashboard() {
                                 {/* Progress Tracking */}
                                 <div className="mb-6">
                                     <h3 className="font-semibold mb-2">Progress</h3>
-                                    {selectedOrder.services && selectedOrder.services.length > 0 && 
+                                    {selectedOrder.services && 
+                                     selectedOrder.services.length > 0 && 
+                                     selectedOrder.services[0].status !== 'cancelled' &&
+                                     selectedOrder.services[0].job_status !== 'cancelled' && 
                                         renderProgressStatus(selectedOrder.services[0].job_status || 'pending')}
+                                    
+                                    {selectedOrder.services && 
+                                     selectedOrder.services.length > 0 && 
+                                     (selectedOrder.services[0].status === 'cancelled' ||
+                                      selectedOrder.services[0].job_status === 'cancelled') && 
+                                        <div className="bg-red-50 text-red-700 p-4 rounded-lg">
+                                            This order has been cancelled.
+                                        </div>
+                                    }
                                 </div>
                                 
                                 {/* Services */}
@@ -546,14 +557,14 @@ function CustomerDashboard() {
                                     {/* Show withdraw button if service is still pending */}
                                     {selectedOrder.services && 
                                      selectedOrder.services.length > 0 && 
-                                     selectedOrder.services[0].status === 'pending' && (
-                                        <button
-                                            onClick={() => handleWithdraw(selectedOrder.services[0].request_id)}
-                                            className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium"
-                                        >
-                                            Withdraw Request
-                                        </button>
-                                    )}
+                                     (selectedOrder.services[0].job_status === 'pending' || selectedOrder.services[0].status === 'pending' || selectedOrder.services[0].status === 'assigned' || selectedOrder.services[0].status === 'on_the_way' || selectedOrder.services[0].status === 'arrived' || selectedOrder.services[0].status === 'in_progress') && (
+                                         <button
+                                             onClick={() => handleWithdraw(selectedOrder.services[0].request_id)}
+                                             className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium"
+                                         >
+                                             Withdraw Request
+                                         </button>
+                                     )}
                                 </div>
                             </div>
                         </div>
