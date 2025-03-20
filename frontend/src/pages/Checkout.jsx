@@ -817,7 +817,7 @@ const Checkout = () => {
                                 type="submit"
                                 className="w-full bg-yellow-400 text-black py-4 px-6 rounded-lg font-medium hover:bg-yellow-500 transition-colors shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
                             >
-                                <span>Place Order</span>
+                                <span>Place Service Request</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>

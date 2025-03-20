@@ -138,6 +138,12 @@ function Login() {
                                         Create one now
                                     </Link>
                                 </p>
+                                <p className="text-gray-600 text-sm mt-2">
+                                    Want to join as a serviceman?{' '}
+                                    <Link to="/serviceman-register" className="text-yellow-600 hover:text-yellow-700 font-medium">
+                                        Register as serviceman
+                                    </Link>
+                                </p>
                                 <div className="mt-2">
                                     <Link to="/forgot-password" className="text-yellow-600 hover:text-yellow-700 text-sm">
                                         Forgot your password?

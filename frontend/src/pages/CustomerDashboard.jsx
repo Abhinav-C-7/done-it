@@ -340,7 +340,7 @@ function CustomerDashboard() {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-400">
-                        <h3 className="text-gray-500 text-sm font-medium">Total Orders</h3>
+                        <h3 className="text-gray-500 text-sm font-medium">Total Service Requests</h3>
                         <p className="text-3xl font-bold">{stats.total}</p>
                     </div>
                     <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-400">
@@ -365,7 +365,7 @@ function CustomerDashboard() {
                             to="/all-orders" 
                             className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
                         >
-                            View All Orders
+                            View All Service Requests
                         </Link>
                     </div>
                     
@@ -423,7 +423,7 @@ function CustomerDashboard() {
                                 {orders.length === 0 && (
                                     <tr>
                                         <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                                            No orders found. Book a service to get started!
+                                            No service requests found. Book a service to get started!
                                         </td>
                                     </tr>
                                 )}
