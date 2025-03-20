@@ -522,22 +522,6 @@ function AllOrders() {
                                 </p>
                             </div>
                             
-                            {/* Show payment button if service is completed but payment is pending */}
-                            {selectedOrder.services && 
-                             selectedOrder.services.length > 0 && 
-                             (selectedOrder.services[0].job_status === 'completed' || selectedOrder.services[0].status === 'completed') && 
-                             (!selectedOrder.payment_status || selectedOrder.payment_status !== 'paid') && (
-                                <button
-                                    onClick={() => handlePayment(
-                                        selectedOrder.payment_id, 
-                                        selectedOrder.total_amount ? parseFloat(selectedOrder.total_amount) : 0
-                                    )}
-                                    className="w-full mt-4 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-medium"
-                                >
-                                    Pay Now
-                                </button>
-                            )}
-                            
                             {/* Show withdraw button if service is still pending */}
                             {selectedOrder.services && 
                              selectedOrder.services.length > 0 && 

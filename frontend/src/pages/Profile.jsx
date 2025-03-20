@@ -49,17 +49,22 @@ function Profile() {
           }
         });
 
-        if (profileResponse.data) {
+        console.log('Profile data received:', profileResponse.data);
+
+        // Extract user data from the response
+        const userData = profileResponse.data.user;
+        
+        if (userData) {
           setProfileData({
-            fullName: profileResponse.data.full_name || '',
-            email: profileResponse.data.email || '',
-            phone: profileResponse.data.phone_number || '',
-            address: profileResponse.data.address || ''
+            fullName: userData.full_name || '',
+            email: userData.email || '',
+            phone: userData.phone_number || '',
+            address: userData.address || ''
           });
           
           // Set profile picture if available from the backend
-          if (profileResponse.data.profile_picture) {
-            setProfilePicture(profileResponse.data.profile_picture);
+          if (userData.profile_picture) {
+            setProfilePicture(userData.profile_picture);
           }
         }
 
@@ -160,6 +165,12 @@ function Profile() {
 
       setIsEditing(false);
       setLoading(false);
+      setSuccessMessage('Profile updated successfully');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
     } catch (err) {
       console.error('Error updating profile:', err);
       setError('Failed to update profile');
@@ -350,6 +361,10 @@ function Profile() {
                   src={profilePicture} 
                   alt="Profile" 
                   className="w-32 h-32 rounded-full object-cover border-4 border-yellow-500"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = defaultProfilePic;
+                  }}
                 />
                 <label 
                   htmlFor="profile-picture" 
@@ -496,15 +511,18 @@ function Profile() {
                   <div key={review.id} className="border-b pb-4 last:border-b-0 last:pb-0">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-medium">{review.serviceType} Service by {review.servicemanName}</h3>
-                        <div className="flex items-center mt-1">
-                          <div className="flex">
-                            {renderStars(review.rating)}
-                          </div>
-                          <span className="ml-2 text-sm text-gray-600">{review.rating.toFixed(1)}</span>
-                        </div>
+                        <h3 className="font-medium">{review.serviceType}</h3>
+                        <p className="text-sm text-gray-500">Serviceman: {review.servicemanName}</p>
                       </div>
-                      <span className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString()}</span>
+                      <div className="text-sm text-gray-500">
+                        {new Date(review.date).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {renderStars(review.rating)}
+                      </div>
+                      <span className="ml-2 text-sm text-gray-600">{review.rating}/5</span>
                     </div>
                     <p className="mt-2 text-gray-700">{review.comment}</p>
                   </div>

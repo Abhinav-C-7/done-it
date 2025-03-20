@@ -178,6 +178,38 @@ function Home() {
         ));
     };
 
+    // Handle payment navigation for price update notifications
+    const handlePaymentNavigation = (notification) => {
+        // Ensure we have the necessary data from the notification
+        const requestId = notification.reference_id;
+        const amount = notification.amount;
+        const paymentId = notification.payment_id;
+        const serviceType = notification.service_type || 'Service';
+        
+        // Navigate to payment page with the correct payment details
+        navigate('/payment', {
+            state: {
+                paymentDetails: {
+                    paymentRequestId: paymentId,
+                    requestId: requestId,
+                    bookingFee: 0,
+                    servicePayment: true,
+                    orderDetails: {
+                        request_id: requestId,
+                        services: [{
+                            type: serviceType,
+                            price: amount,
+                            additionalCharges: 0,
+                            totalAmount: amount
+                        }],
+                        total: amount,
+                        payment_method: 'demo'
+                    }
+                }
+            }
+        });
+    };
+
     return (
         <Layout>
             <div className="min-h-screen bg-gray-50">
@@ -201,29 +233,7 @@ function Home() {
                                                         <div key={notification.id || notification.notification_id} className="mb-2 last:mb-0">
                                                             <p>{notification.message}</p>
                                                             <button 
-                                                                onClick={() => {
-                                                                    navigate('/payment', {
-                                                                        state: {
-                                                                            paymentDetails: {
-                                                                                paymentRequestId: notification.payment_id || `payment_${Date.now()}`,
-                                                                                requestId: notification.reference_id,
-                                                                                bookingFee: 0,
-                                                                                servicePayment: true,
-                                                                                orderDetails: {
-                                                                                    request_id: notification.reference_id,
-                                                                                    services: [{
-                                                                                        type: notification.service_type || 'Service',
-                                                                                        price: notification.amount || 1500,
-                                                                                        additionalCharges: 0,
-                                                                                        totalAmount: notification.amount || 1500
-                                                                                    }],
-                                                                                    total: notification.amount || 1500,
-                                                                                    payment_method: 'demo'
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    });
-                                                                }}
+                                                                onClick={() => handlePaymentNavigation(notification)}
                                                                 className="mt-1 text-sm font-medium text-yellow-600 hover:text-yellow-500"
                                                             >
                                                                 Pay Now
