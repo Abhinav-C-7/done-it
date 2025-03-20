@@ -490,7 +490,6 @@ function AllOrders() {
                                     <div key={index} className={index > 0 ? 'mt-4 pt-4 border-t' : ''}>
                                         <div className="flex justify-between">
                                             <p className="font-medium">{service.service_type}</p>
-                                            <p className="font-medium">₹{service.amount ? parseFloat(service.amount).toFixed(2) : '0.00'}</p>
                                         </div>
                                         <p className="text-sm text-gray-500">{service.service_description || 'No description provided'}</p>
                                     </div>
@@ -516,16 +515,24 @@ function AllOrders() {
                         {/* Payment Section */}
                         <div className="mt-6 border-t pt-6">
                             <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-semibold">Total Amount</h3>
+                                <h3 className="font-semibold">Order Status</h3>
                                 <p className="text-xl font-bold">
-                                    ₹{selectedOrder.total_amount ? parseFloat(selectedOrder.total_amount).toFixed(2) : '0.00'}
+                                    {selectedOrder.services && selectedOrder.services.length > 0 ? 
+                                        (selectedOrder.services[0].job_status === 'completed' ? 'Completed' : 
+                                        selectedOrder.services[0].job_status === 'cancelled' ? 'Cancelled' : 
+                                        'In Progress') : 'Pending'}
                                 </p>
                             </div>
                             
                             {/* Show withdraw button if service is still pending */}
                             {selectedOrder.services && 
                              selectedOrder.services.length > 0 && 
-                             (selectedOrder.services[0].job_status === 'pending' || selectedOrder.services[0].status === 'pending') && (
+                             (selectedOrder.services[0].job_status === 'pending' || 
+                              selectedOrder.services[0].status === 'pending' || 
+                              selectedOrder.services[0].status === 'assigned' || 
+                              selectedOrder.services[0].status === 'on_the_way' || 
+                              selectedOrder.services[0].status === 'arrived' || 
+                              selectedOrder.services[0].status === 'in_progress') && (
                                 <button
                                     onClick={() => handleWithdraw(selectedOrder.services[0].request_id)}
                                     className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium"
@@ -633,9 +640,6 @@ function AllOrders() {
                                         Date
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Amount
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
                                     </th>
                                 </tr>
@@ -656,9 +660,6 @@ function AllOrders() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(order.created_at).toLocaleDateString()}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            ₹{parseFloat(order.total_amount).toFixed(2)}
-                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                                 ${order.services[0].job_status === 'completed' ? 'bg-green-100 text-green-800' : 
@@ -672,7 +673,7 @@ function AllOrders() {
                                 
                                 {filteredOrders.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
                                             No orders found with the selected filter.
                                         </td>
                                     </tr>
