@@ -172,17 +172,54 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
 
     const handleServiceClick = (service) => {
         const title = service.title?.trim();
+        console.log('Service clicked:', service);
+        console.log('Service title:', title);
+        
         if (SERVICE_ROUTES[title]) {
+            console.log('Found direct route match:', SERVICE_ROUTES[title].route);
             navigate(SERVICE_ROUTES[title].route);
-        } else {
-            const matchingTitle = Object.keys(SERVICE_ROUTES).find(key => 
-                title.toLowerCase().includes(key.toLowerCase()) || 
-                key.toLowerCase().includes(title.toLowerCase())
-            );
-            if (matchingTitle) {
-                navigate(SERVICE_ROUTES[matchingTitle].route);
+            return;
+        } 
+        
+        // If not found directly, try to find a similar title
+        const matchingTitle = Object.keys(SERVICE_ROUTES).find(key => 
+            title.toLowerCase().includes(key.toLowerCase()) || 
+            key.toLowerCase().includes(title.toLowerCase())
+        );
+        
+        if (matchingTitle) {
+            console.log('Found matching title:', matchingTitle);
+            console.log('Navigating to:', SERVICE_ROUTES[matchingTitle].route);
+            navigate(SERVICE_ROUTES[matchingTitle].route);
+            return;
+        }
+        
+        // If all else fails, try to determine the route from the service type or category
+        if (service.category) {
+            const categoryLower = service.category.toLowerCase();
+            if (categoryLower === 'plumbing') {
+                console.log('Navigating to plumbing by category');
+                navigate('/services/plumbing');
+                return;
+            } else if (categoryLower === 'electrical') {
+                navigate('/services/electrical');
+                return;
+            } else if (categoryLower === 'cleaning') {
+                navigate('/services/cleaning');
+                return;
+            } else if (categoryLower === 'carpentry') {
+                navigate('/services/carpentry');
+                return;
+            } else if (categoryLower === 'painting') {
+                navigate('/services/painting');
+                return;
+            } else if (categoryLower === 'pest control') {
+                navigate('/services/pestcontrol');
+                return;
             }
         }
+        
+        console.log('No matching route found for service:', service);
     };
 
     if (loading) {
