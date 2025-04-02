@@ -383,9 +383,6 @@ function CustomerDashboard() {
                                         Date
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Amount
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
                                     </th>
                                 </tr>
@@ -406,9 +403,6 @@ function CustomerDashboard() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(order.created_at).toLocaleDateString()}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            ₹{parseFloat(order.total_amount).toFixed(2)}
-                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                                 ${order.services[0].job_status === 'completed' ? 'bg-green-100 text-green-800' : 
@@ -422,7 +416,7 @@ function CustomerDashboard() {
                                 
                                 {orders.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
                                             No service requests found. Book a service to get started!
                                         </td>
                                     </tr>
