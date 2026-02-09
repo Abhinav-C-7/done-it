@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 const PaymentPage = () => {
     const location = useLocation();
@@ -17,7 +17,7 @@ const PaymentPage = () => {
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     const [reviewSubmitted, setReviewSubmitted] = useState(false);
     const { user } = useAuth();
-    
+
     // Get payment details from location state
     const paymentDetails = location.state?.paymentDetails;
     const bookingFee = paymentDetails?.bookingFee || 49;
@@ -25,7 +25,7 @@ const PaymentPage = () => {
     const serviceDetails = isServicePayment ? paymentDetails?.orderDetails?.services[0] : null;
     const paymentAmount = isServicePayment ? serviceDetails?.totalAmount : bookingFee;
     const paymentRequestId = isServicePayment ? paymentDetails?.paymentRequestId : null;
-    
+
     useEffect(() => {
         // Redirect if no payment details
         if (!paymentDetails) {
@@ -43,7 +43,7 @@ const PaymentPage = () => {
                 console.error('Invalid token format');
                 return null;
             }
-            
+
             // Base64 decode the payload part
             const payload = parts[1];
             // Convert base64url to base64
@@ -55,7 +55,7 @@ const PaymentPage = () => {
                     .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
                     .join('')
             );
-            
+
             return JSON.parse(jsonPayload);
         } catch (error) {
             console.error('Error decoding token:', error);
@@ -68,10 +68,10 @@ const PaymentPage = () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) return null;
-            
+
             const decoded = decodeJWT(token);
             console.log('Decoded token:', decoded);
-            
+
             // Return the ID from the token
             return decoded?.id;
         } catch (error) {
@@ -86,31 +86,31 @@ const PaymentPage = () => {
             // Get the order details from payment details
             const orderDetails = paymentDetails.orderDetails;
             const formData = paymentDetails.formData;
-            
+
             // Ensure we have the necessary data
             if (!orderDetails || !formData) {
                 throw new Error('Missing order details or form data');
             }
-            
+
             // Get customer ID from multiple sources to ensure we have it
             let customerId = null;
-            
+
             // First try to get it from the user object in context
             if (user && user.id) {
                 customerId = user.id;
                 console.log('Using customer ID from user context:', customerId);
-            } 
+            }
             // Then try to get it from the JWT token
             else {
                 customerId = getUserIdFromToken();
                 console.log('Using customer ID from JWT token:', customerId);
             }
-            
+
             // If still no customer ID, throw an error
             if (!customerId) {
                 throw new Error('Could not determine customer ID. Please log in again.');
             }
-            
+
             // Create a service request for each service in the order
             const orderPromises = orderDetails.services.map(async (item) => {
                 // Parse and clean amount, add booking fee divided by number of items
@@ -118,7 +118,7 @@ const PaymentPage = () => {
                 const serviceFeePerItem = 0; // Adjust if you have a service fee
                 const itemPrice = parseFloat(item.price);
                 const cleanAmount = itemPrice + bookingFeePerItem + serviceFeePerItem;
-                
+
                 const requestData = {
                     customer_id: customerId,
                     service_type: item.type,
@@ -135,7 +135,7 @@ const PaymentPage = () => {
                     payment_id: paymentId,
                     amount: cleanAmount
                 };
-                
+
                 console.log('Creating service request with data:', requestData);
                 const response = await fetch(`${API_BASE_URL}/services/request`, {
                     method: 'POST',
@@ -145,21 +145,21 @@ const PaymentPage = () => {
                     },
                     body: JSON.stringify(requestData)
                 });
-                
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     console.error('Server error response:', errorData);
                     throw new Error(errorData.message || 'Failed to create service request');
                 }
-                
+
                 const responseData = await response.json();
                 console.log('Service request created:', responseData);
                 return responseData;
             });
-            
+
             const createdRequests = await Promise.all(orderPromises);
             console.log('All service requests created:', createdRequests);
-            
+
             // Return the first created request as the main order
             return createdRequests[0];
         } catch (error) {
@@ -170,32 +170,32 @@ const PaymentPage = () => {
 
     const handlePayment = async () => {
         setIsProcessing(true);
-        
+
         try {
             // Simulate payment processing
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
+
             // Simulate successful payment
             setPaymentSuccess(true);
-            
+
             // If this is a service payment, show rating after payment success
             if (isServicePayment) {
                 setShowRating(true);
-                
+
                 // Create payment response with unique ID
                 const demoResponse = {
                     razorpay_order_id: paymentDetails.orderId || paymentDetails.requestId,
                     razorpay_payment_id: 'pay_demo_' + Date.now(),
                 };
-                
+
                 try {
                     // For service payments, update the payment status to 'paid'
                     const token = localStorage.getItem('token');
-                    
+
                     if (!token) {
                         throw new Error('No authentication token found');
                     }
-                    
+
                     // Update payment request status to 'paid'
                     const response = await fetch(`${API_BASE_URL}/customer/payment-requests/${paymentRequestId}/pay`, {
                         method: 'PUT',
@@ -207,16 +207,16 @@ const PaymentPage = () => {
                             paymentId: demoResponse.razorpay_payment_id
                         })
                     });
-                    
+
                     if (!response.ok) {
                         const errorData = await response.json();
                         console.error('Server error response:', errorData);
                         throw new Error(errorData.message || 'Failed to update payment status');
                     }
-                    
+
                     const responseData = await response.json();
                     console.log('Payment status updated:', responseData);
-                    
+
                     // Don't redirect - wait for user to submit rating
                 } catch (error) {
                     console.error('Failed to update payment status:', error);
@@ -231,23 +231,23 @@ const PaymentPage = () => {
                         razorpay_order_id: paymentDetails.orderId || paymentDetails.requestId,
                         razorpay_payment_id: 'pay_demo_' + Date.now(),
                     };
-                    
+
                     try {
                         // Create service requests in the database
                         const createdRequest = await createServiceRequests(demoResponse.razorpay_payment_id);
-                        
+
                         // Add the request_id to the order details
                         const updatedOrderDetails = {
                             ...paymentDetails.orderDetails,
                             payment_id: demoResponse.razorpay_payment_id,
                             request_id: createdRequest.request_id
                         };
-                        
+
                         // For booking fee payments, redirect to order confirmation
-                        navigate('/order-confirmation', { 
-                            state: { 
+                        navigate('/order-confirmation', {
+                            state: {
                                 orderDetails: updatedOrderDetails
-                            } 
+                            }
                         });
                     } catch (error) {
                         console.error('Failed to create service request:', error);
@@ -265,31 +265,31 @@ const PaymentPage = () => {
     const handleRatingClick = (value) => {
         setRating(value);
     };
-    
+
     const handleSubmitReview = async () => {
         if (rating === 0) {
             alert('Please select a rating before submitting');
             return;
         }
-        
+
         setIsSubmittingReview(true);
-        
+
         try {
             const token = localStorage.getItem('token');
-            
+
             if (!token) {
                 throw new Error('No authentication token found');
             }
-            
+
             // Log payment details for debugging
             console.log('Payment details:', paymentDetails);
-            
+
             // Get service_request_id from the payment request
             const requestId = paymentDetails.requestId || paymentDetails.orderId;
-            
+
             // For service payments, the serviceman_id should be in the payment request
             let servicemanId;
-            
+
             if (isServicePayment && paymentDetails.servicemanId) {
                 servicemanId = paymentDetails.servicemanId;
             } else if (isServicePayment && paymentDetails.orderDetails && paymentDetails.orderDetails.serviceman_id) {
@@ -302,11 +302,11 @@ const PaymentPage = () => {
                             'Authorization': `Bearer ${token}`
                         }
                     });
-                    
+
                     if (!serviceResponse.ok) {
                         throw new Error('Failed to fetch service request details');
                     }
-                    
+
                     const serviceData = await serviceResponse.json();
                     servicemanId = serviceData.assigned_serviceman;
                     console.log('Retrieved serviceman_id from service request:', servicemanId);
@@ -316,21 +316,21 @@ const PaymentPage = () => {
                     servicemanId = null;
                 }
             }
-            
+
             // Prepare the review data
             const reviewData = {
                 service_request_id: parseInt(requestId),
                 rating,
                 comment
             };
-            
+
             // Only include serviceman_id if we have it
             if (servicemanId) {
                 reviewData.serviceman_id = servicemanId;
             }
-            
+
             console.log('Submitting review with data:', reviewData);
-            
+
             // Submit the review
             const response = await axios.post(
                 `${API_BASE_URL}/customer/reviews`,
@@ -341,27 +341,27 @@ const PaymentPage = () => {
                     }
                 }
             );
-            
+
             console.log('Review submitted:', response.data);
             setReviewSubmitted(true);
-            
+
             // Redirect after a short delay
             setTimeout(() => {
-                navigate('/transactions', { 
-                    state: { 
+                navigate('/transactions', {
+                    state: {
                         paymentSuccess: true,
                         reviewSubmitted: true
-                    } 
+                    }
                 });
             }, 2000);
         } catch (error) {
             console.error('Error submitting review:', error);
-            
+
             // Show more detailed error information
             if (error.response) {
                 console.error('Error response data:', error.response.data);
             }
-            
+
             alert('Failed to submit review. Please try again.');
             setIsSubmittingReview(false);
         }
@@ -377,7 +377,7 @@ const PaymentPage = () => {
             <div className="max-w-4xl mx-auto pt-24 pb-12 px-4">
                 <div className="bg-white rounded-lg shadow-md p-6 md:p-8">
                     <h1 className="text-2xl font-bold text-gray-800 mb-6">Complete Your Payment</h1>
-                    
+
                     {paymentSuccess && showRating && !reviewSubmitted ? (
                         <div className="text-center py-6">
                             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -389,10 +389,10 @@ const PaymentPage = () => {
                             <p className="text-gray-600 mb-6">
                                 Your service payment has been completed. Please rate your experience.
                             </p>
-                            
+
                             <div className="max-w-md mx-auto bg-gray-50 p-6 rounded-lg shadow-sm">
                                 <h3 className="text-lg font-medium text-gray-800 mb-4">Rate Your Experience</h3>
-                                
+
                                 <div className="flex justify-center space-x-2 mb-6">
                                     {[1, 2, 3, 4, 5].map((star) => (
                                         <button
@@ -403,9 +403,8 @@ const PaymentPage = () => {
                                         >
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
-                                                className={`h-8 w-8 ${
-                                                    star <= rating ? 'text-yellow-400' : 'text-gray-300'
-                                                }`}
+                                                className={`h-8 w-8 ${star <= rating ? 'text-yellow-400' : 'text-gray-300'
+                                                    }`}
                                                 viewBox="0 0 20 20"
                                                 fill="currentColor"
                                             >
@@ -416,7 +415,7 @@ const PaymentPage = () => {
                                         </button>
                                     ))}
                                 </div>
-                                
+
                                 <div className="mb-4">
                                     <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">
                                         Additional Comments (Optional)
@@ -430,15 +429,14 @@ const PaymentPage = () => {
                                         onChange={(e) => setComment(e.target.value)}
                                     ></textarea>
                                 </div>
-                                
+
                                 <button
                                     onClick={handleSubmitReview}
                                     disabled={isSubmittingReview || rating === 0}
-                                    className={`w-full py-2 px-4 rounded-lg font-medium text-white ${
-                                        isSubmittingReview || rating === 0
+                                    className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isSubmittingReview || rating === 0
                                             ? 'bg-gray-400 cursor-not-allowed'
                                             : 'bg-yellow-400 hover:bg-yellow-500'
-                                    } transition-colors shadow-sm`}
+                                        } transition-colors shadow-sm`}
                                 >
                                     {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
                                 </button>
@@ -469,8 +467,8 @@ const PaymentPage = () => {
                             </div>
                             <h2 className="text-xl font-semibold text-gray-800 mb-2">Payment Successful!</h2>
                             <p className="text-gray-600 mb-4">
-                                {isServicePayment 
-                                    ? "Your service payment has been completed." 
+                                {isServicePayment
+                                    ? "Your service payment has been completed."
                                     : "Your service request has been confirmed."}
                             </p>
                             <p className="text-gray-500 text-sm">
@@ -485,7 +483,7 @@ const PaymentPage = () => {
                                 <h2 className="text-lg font-semibold text-gray-800 mb-4">
                                     {isServicePayment ? "Service Payment" : "Booking Fee"}
                                 </h2>
-                                
+
                                 {isServicePayment && (
                                     <div className="mb-4 bg-gray-50 p-4 rounded-md">
                                         <h3 className="font-medium text-gray-700 mb-2">{serviceDetails.type}</h3>
@@ -503,7 +501,7 @@ const PaymentPage = () => {
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                                     <span className="text-gray-600">
                                         {isServicePayment ? "Amount to Pay" : "Booking Fee"}
@@ -511,12 +509,12 @@ const PaymentPage = () => {
                                     <span className="font-medium text-gray-800">₹{paymentAmount}</span>
                                 </div>
                                 <p className="text-sm text-gray-600 mt-3">
-                                    {isServicePayment 
-                                        ? "This payment completes your service request." 
+                                    {isServicePayment
+                                        ? "This payment completes your service request."
                                         : "This booking fee confirms your service request. It is fully refundable if canceled before a serviceman accepts the request"}
                                 </p>
                             </div>
-                            
+
                             <div className="mb-6">
                                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h2>
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -535,7 +533,7 @@ const PaymentPage = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <button
                                 onClick={handlePayment}
                                 disabled={isProcessing}

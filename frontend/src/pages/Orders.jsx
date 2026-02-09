@@ -15,14 +15,14 @@ const Orders = () => {
             try {
                 const token = localStorage.getItem('token');
                 console.log('Current auth state:', { user, token: token ? 'Token exists' : 'No token' });
-                
+
                 if (!token) {
                     console.log('No token found, redirecting to login');
                     throw new Error('Not authenticated');
                 }
 
                 // Updated endpoint to use the new orders route
-                const response = await fetch('http://localhost:3000/api/orders/my-orders', {
+                const response = await fetch(import.meta.env.VITE_API_URL + '/api/orders/my-orders', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -84,7 +84,7 @@ const Orders = () => {
         <Layout>
             <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
                 <h1 className="text-3xl font-bold text-gray-900 mb-6">My Orders</h1>
-                
+
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
@@ -155,7 +155,7 @@ const Orders = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <h4 className="text-md font-medium text-gray-900 mb-2">Services</h4>
                                     <div className="border-t border-gray-200 pt-4">
                                         <div className="space-y-4">

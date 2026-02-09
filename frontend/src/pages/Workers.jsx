@@ -5,9 +5,9 @@ import Navbar from "../components/Navbar";
 import post from "../assets/images/post.png";
 import homefull from "../assets/images/home-full.png";
 import profile from "../assets/images/profile.png";
-import Searchbar from "../components/Searchbar"; 
+import Searchbar from "../components/Searchbar";
 import Showservice from "../components/Showservice";
-import worker1 from "../assets/images/worker0.png"; 
+import worker1 from "../assets/images/worker0.png";
 
 function Workers() {
   const [workers, setWorkers] = useState([]);
@@ -19,7 +19,7 @@ function Workers() {
   useEffect(() => {
     const fetchWorkers = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/workers');
+        const response = await axios.get(import.meta.env.VITE_API_URL + '/api/workers');
         setWorkers(response.data);
         setFilteredWorkers(response.data);
         setLoading(false);
@@ -54,7 +54,7 @@ function Workers() {
       <Topbar workersBg="bg-yellow-400" />
       <div className="max-w-7xl mx-auto">
         <Searchbar onSearch={handleSearch} placeholder="Search for services or workers..." />
-        
+
         {error && (
           <div className="text-red-500 text-center p-4">
             {error}

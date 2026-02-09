@@ -34,7 +34,7 @@ function ServicemanRegister() {
     useEffect(() => {
         // Fetch available services
         console.log('Fetching services...');
-        fetch('http://localhost:3000/api/services')
+        fetch(`${import.meta.env.VITE_API_URL}/api/services`)
             .then(res => {
                 console.log('Response status:', res.status);
                 if (!res.ok) {
@@ -78,7 +78,7 @@ function ServicemanRegister() {
     const handleSearchChange = (e) => {
         const query = e.target.value;
         setSearchQuery(query);
-        
+
         if (query.length > 2) {
             searchLocation(query);
         } else {
@@ -94,7 +94,7 @@ function ServicemanRegister() {
         });
         setSearchQuery(location.display_name);
         setSuggestions([]);
-        
+
         if (map) {
             map.setView([location.lat, location.lon], 16);
             if (marker) {
@@ -118,15 +118,15 @@ function ServicemanRegister() {
 
     const handleMapClick = async (e) => {
         const { lat, lng } = e.latlng;
-        
+
         try {
             const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
             const data = await response.json();
             const address = data.display_name;
-            
+
             updateLocationData(lat, lng, address);
             setSearchQuery(address);
-            
+
             if (marker) {
                 marker.setLatLng([lat, lng]);
             }
@@ -137,39 +137,39 @@ function ServicemanRegister() {
 
     const initMap = () => {
         if (!mapRef.current) return;
-        
+
         // Default to a location in India if none selected
         const defaultLat = selectedLocation?.lat || 20.5937;
         const defaultLng = selectedLocation?.lng || 78.9629;
-        
+
         const mapInstance = L.map(mapRef.current).setView([defaultLat, defaultLng], 5);
-        
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: ' OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(mapInstance);
-        
-        const markerInstance = L.marker([defaultLat, defaultLng], { 
+
+        const markerInstance = L.marker([defaultLat, defaultLng], {
             draggable: true,
             icon: new L.Icon.Default()
         }).addTo(mapInstance);
-        
-        markerInstance.on('dragend', async function(e) {
+
+        markerInstance.on('dragend', async function (e) {
             const position = e.target.getLatLng();
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.lat}&lon=${position.lng}`);
                 const data = await response.json();
                 const address = data.display_name;
-                
+
                 updateLocationData(position.lat, position.lng, address);
                 setSearchQuery(address);
             } catch (error) {
                 console.error('Error getting address:', error);
             }
         });
-        
+
         mapInstance.on('click', handleMapClick);
-        
+
         setMap(mapInstance);
         setMarker(markerInstance);
     };
@@ -178,7 +178,7 @@ function ServicemanRegister() {
         if (showMap && !map && mapRef.current) {
             initMap();
         }
-        
+
         return () => {
             if (map) {
                 map.remove();
@@ -238,17 +238,17 @@ function ServicemanRegister() {
 
         try {
             console.log('Submitting registration with current_location:', formData.current_location);
-            
+
             // Create a copy of the form data to avoid modifying the original state
             const formDataToSubmit = { ...formData };
-            
+
             // Make sure current_location is in the format PostgreSQL expects
             if (formDataToSubmit.current_location && !formDataToSubmit.current_location.startsWith('(')) {
                 formDataToSubmit.current_location = `(${formDataToSubmit.current_location})`;
             }
-            
+
             console.log('Formatted current_location for submission:', formDataToSubmit.current_location);
-            
+
             const response = await registerServiceman(formDataToSubmit);
             if (response.success) {
                 setIsRegistrationSuccessful(true);
@@ -266,7 +266,7 @@ function ServicemanRegister() {
             const timer = setTimeout(() => {
                 navigate('/login');
             }, 5000);
-            
+
             return () => clearTimeout(timer);
         }
     }, [isRegistrationSuccessful, navigate]);
@@ -295,8 +295,8 @@ function ServicemanRegister() {
             <p className="text-sm text-gray-500 mb-4">
                 You will be redirected to the login page in a few seconds...
             </p>
-            <button 
-                onClick={() => navigate('/login')} 
+            <button
+                onClick={() => navigate('/login')}
                 className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200"
             >
                 Go to Login
@@ -455,13 +455,12 @@ function ServicemanRegister() {
                                         <div className="bg-white p-4 rounded-xl border border-gray-200">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto mb-4 p-2">
                                                 {services.map(service => (
-                                                    <div 
+                                                    <div
                                                         key={service.service_id}
-                                                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${
-                                                            formData.skills.includes(service.title)
+                                                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${formData.skills.includes(service.title)
                                                                 ? 'bg-yellow-50'
                                                                 : 'hover:bg-gray-50'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -472,14 +471,14 @@ function ServicemanRegister() {
                                                                 const value = e.target.value;
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    skills: e.target.checked 
+                                                                    skills: e.target.checked
                                                                         ? [...prev.skills, value]
                                                                         : prev.skills.filter(skill => skill !== value)
                                                                 }));
                                                             }}
                                                             className="w-5 h-5 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400"
                                                         />
-                                                        <label 
+                                                        <label
                                                             htmlFor={`skill-${service.service_id}`}
                                                             className="flex-grow text-gray-700 cursor-pointer select-none hover:text-yellow-600"
                                                         >
@@ -488,7 +487,7 @@ function ServicemanRegister() {
                                                     </div>
                                                 ))}
                                             </div>
-                                            
+
                                             {/* Selected Skills Preview */}
                                             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                                                 <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
@@ -589,7 +588,7 @@ function ServicemanRegister() {
                                                 </svg>
                                             </button>
                                         </div>
-                                        
+
                                         {/* Location Suggestions */}
                                         {suggestions.length > 0 && (
                                             <div className="mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -604,7 +603,7 @@ function ServicemanRegister() {
                                                 ))}
                                             </div>
                                         )}
-                                        
+
                                         {formData.current_location && (
                                             <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
                                                 <div className="flex items-center">
@@ -620,7 +619,7 @@ function ServicemanRegister() {
                                                 )}
                                             </div>
                                         )}
-                                        
+
                                         {!formData.current_location && (
                                             <p className="text-sm text-red-500 mt-1 flex items-center">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -643,14 +642,14 @@ function ServicemanRegister() {
                     </div>
                 )}
             </div>
-            
+
             {/* Map Modal */}
             {showMap && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden">
                         <div className="p-4 bg-yellow-50 border-b border-yellow-100 flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-yellow-800">Select Your Preferred Work Location</h3>
-                            <button 
+                            <button
                                 onClick={() => setShowMap(false)}
                                 className="text-gray-500 hover:text-gray-700"
                             >
@@ -659,7 +658,7 @@ function ServicemanRegister() {
                                 </svg>
                             </button>
                         </div>
-                        
+
                         <div className="p-4">
                             <div className="flex mb-4">
                                 <input
@@ -677,7 +676,7 @@ function ServicemanRegister() {
                                     Search
                                 </button>
                             </div>
-                            
+
                             {suggestions.length > 0 && (
                                 <div className="mb-4 bg-white border border-gray-200 rounded-lg shadow-sm max-h-40 overflow-y-auto">
                                     {suggestions.map((suggestion, index) => (
@@ -691,14 +690,14 @@ function ServicemanRegister() {
                                     ))}
                                 </div>
                             )}
-                            
+
                             <div ref={mapRef} style={{ height: '400px', width: '100%' }} className="rounded-lg border border-gray-300"></div>
-                            
+
                             <div className="mt-4 text-sm text-gray-600">
                                 <p>Click on the map or drag the marker to select your preferred work location.</p>
                             </div>
                         </div>
-                        
+
                         <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
                             <button
                                 type="button"

@@ -9,7 +9,7 @@ import profile from "../assets/images/profile.png";
 import axios from 'axios';
 
 // API URL from environment variables (Vite format)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function VerifyEmail() {
     const [verifying, setVerifying] = useState(true);
@@ -25,40 +25,40 @@ function VerifyEmail() {
             try {
                 console.log('Starting registration completion process');
                 setVerifying(true);
-                
+
                 // Get the pending registration data
                 const pendingRegistration = JSON.parse(localStorage.getItem('pendingRegistration') || '{}');
                 console.log('Retrieved pending registration:', pendingRegistration);
                 setPendingUser(pendingRegistration);
-                
+
                 if (!pendingRegistration.email || !pendingRegistration.full_name || !pendingRegistration.password) {
                     setError('Registration data not found. Please try registering again.');
                     setVerifying(false);
                     return;
                 }
-                
+
                 try {
                     // First check if email exists in database
                     const emailCheckResponse = await axios.post(`${API_URL}/auth/check-email-exists`, {
                         email: pendingRegistration.email
                     });
-                    
+
                     // If email already exists in database, show login message
                     if (emailCheckResponse.data.exists) {
                         setError('This email is already registered in our database. Please log in instead.');
                         setVerifying(false);
                         return;
                     }
-                    
+
                     // Register the user in your backend
                     await register({
                         ...pendingRegistration,
                         email_verified: true
                     });
-                    
+
                     // Clear pending registration
                     localStorage.removeItem('pendingRegistration');
-                    
+
                     setSuccess(true);
                     setVerifying(false);
                 } catch (err) {
@@ -72,25 +72,25 @@ function VerifyEmail() {
                 setVerifying(false);
             }
         };
-        
+
         completeRegistration();
     }, [register, location]);
-    
+
     const handleTryAgain = () => {
         navigate('/register');
     };
-    
+
     const handleResendVerification = async () => {
         try {
             setVerifying(true);
             const user = auth.currentUser;
-            
+
             if (!user) {
                 setError('No user found. Please try registering again.');
                 setVerifying(false);
                 return;
             }
-            
+
             await user.sendEmailVerification();
             setError('Verification email resent. Please check your inbox.');
             setVerifying(false);
@@ -100,27 +100,27 @@ function VerifyEmail() {
             setVerifying(false);
         }
     };
-    
+
     const handleConfirmRegistration = async () => {
         try {
             setVerifying(true);
             const pendingRegistration = JSON.parse(localStorage.getItem('pendingRegistration') || '{}');
-            
+
             if (!pendingRegistration.email || !pendingRegistration.full_name || !pendingRegistration.password) {
                 setError('Registration data not found. Please try registering again.');
                 setVerifying(false);
                 return;
             }
-            
+
             // Register the user in your backend
             await register({
                 ...pendingRegistration,
                 email_verified: true
             });
-            
+
             // Clear pending registration
             localStorage.removeItem('pendingRegistration');
-            
+
             setSuccess(true);
             setVerifying(false);
         } catch (err) {
@@ -129,14 +129,14 @@ function VerifyEmail() {
             setVerifying(false);
         }
     };
-    
+
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
             <Navbar posticon={post} homeicon={homefull} profileicon={profile} hideAuthButtons={true} />
             <div className="flex-grow flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
                     <h2 className="text-2xl font-bold mb-6 text-center text-blue-600">Email Verification</h2>
-                    
+
                     {verifying ? (
                         <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
@@ -166,7 +166,7 @@ function VerifyEmail() {
                                     <p>To complete your registration, please confirm your details below:</p>
                                 </div>
                             )}
-                            
+
                             {!error && (
                                 <div className="mb-6">
                                     <div className="border rounded-lg p-4 mb-4">
@@ -177,7 +177,7 @@ function VerifyEmail() {
                                             <p><span className="font-medium">Phone:</span> {pendingUser.phone_number}</p>
                                         )}
                                     </div>
-                                    
+
                                     <button
                                         onClick={handleConfirmRegistration}
                                         className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 mb-2"
@@ -185,7 +185,7 @@ function VerifyEmail() {
                                     >
                                         Confirm Registration
                                     </button>
-                                    
+
                                     <button
                                         onClick={() => navigate('/register')}
                                         className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition duration-300"
@@ -194,7 +194,7 @@ function VerifyEmail() {
                                     </button>
                                 </div>
                             )}
-                            
+
                             {error && (
                                 <div className="text-center">
                                     <button

@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 const Transactions = () => {
     const [transactions, setTransactions] = useState([]);
@@ -15,11 +15,11 @@ const Transactions = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user } = useAuth();
-    
+
     // Check if coming from a successful payment
     const paymentSuccess = location.state?.paymentSuccess;
     const reviewSubmitted = location.state?.reviewSubmitted;
-    
+
     useEffect(() => {
         // Clear location state after reading it
         if (location.state) {
@@ -34,18 +34,18 @@ const Transactions = () => {
     const fetchPaymentRequests = async () => {
         try {
             setIsLoading(true);
-            
+
             // Get token from localStorage
             const token = localStorage.getItem('token');
-            
+
             if (!token) {
                 console.error('No authentication token found');
                 setIsLoading(false);
                 return;
             }
-            
+
             console.log('Fetching payment requests with token:', token ? 'Token exists' : 'No token');
-            
+
             // Fetch all payment requests
             try {
                 const response = await axios.get(
@@ -56,16 +56,16 @@ const Transactions = () => {
                         }
                     }
                 );
-                
+
                 console.log('Payment requests API response:', response.data);
-                
+
                 // Filter for paid and pending transactions
                 const paidTransactions = response.data.filter(payment => payment.status === 'paid');
                 const pendingPaymentRequests = response.data.filter(payment => payment.status === 'pending');
-                
+
                 console.log('Filtered pending payments:', pendingPaymentRequests.length);
                 console.log('Filtered paid transactions:', paidTransactions.length);
-                
+
                 setTransactions(paidTransactions);
                 setPendingPayments(pendingPaymentRequests);
             } catch (apiError) {
@@ -75,12 +75,12 @@ const Transactions = () => {
                     statusText: apiError.response?.statusText,
                     data: apiError.response?.data
                 });
-                
+
                 // Set empty arrays to avoid undefined errors
                 setTransactions([]);
                 setPendingPayments([]);
             }
-            
+
             setIsLoading(false);
         } catch (error) {
             console.error('Error fetching payment requests:', error);
@@ -121,7 +121,7 @@ const Transactions = () => {
                 <div className="flex-1 p-8 pt-24">
                     <div className="max-w-5xl mx-auto">
                         <h1 className="text-2xl font-bold text-gray-800 mb-6">Transactions</h1>
-                        
+
                         {paymentSuccess && (
                             <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
                                 <div className="flex">
@@ -141,7 +141,7 @@ const Transactions = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {reviewSubmitted && (
                             <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
                                 <div className="flex">
@@ -161,27 +161,27 @@ const Transactions = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Tabs */}
                         <div className="flex border-b border-gray-200 mb-6">
                             <button
-                                className={`py-2 px-4 font-medium ${activeTab === 'pending' 
-                                    ? 'text-yellow-600 border-b-2 border-yellow-500' 
+                                className={`py-2 px-4 font-medium ${activeTab === 'pending'
+                                    ? 'text-yellow-600 border-b-2 border-yellow-500'
                                     : 'text-gray-500 hover:text-gray-700'}`}
                                 onClick={() => setActiveTab('pending')}
                             >
                                 Pending Payments
                             </button>
                             <button
-                                className={`py-2 px-4 font-medium ${activeTab === 'history' 
-                                    ? 'text-yellow-600 border-b-2 border-yellow-500' 
+                                className={`py-2 px-4 font-medium ${activeTab === 'history'
+                                    ? 'text-yellow-600 border-b-2 border-yellow-500'
                                     : 'text-gray-500 hover:text-gray-700'}`}
                                 onClick={() => setActiveTab('history')}
                             >
                                 Payment History
                             </button>
                         </div>
-                        
+
                         {isLoading ? (
                             <div className="flex justify-center py-8">
                                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div>
@@ -212,7 +212,7 @@ const Transactions = () => {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="bg-gray-50 p-4 rounded-md mb-4">
                                                             <h4 className="font-medium text-gray-700 mb-2">Price</h4>
                                                             <div className="flex justify-between font-medium text-gray-800">
@@ -220,7 +220,7 @@ const Transactions = () => {
                                                                 <span>₹{payment.amount}</span>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <button
                                                             onClick={() => handlePayNow(payment)}
                                                             className="w-full md:w-auto px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-medium rounded-md transition-colors shadow-sm"
@@ -243,7 +243,7 @@ const Transactions = () => {
                                         )}
                                     </>
                                 )}
-                                
+
                                 {activeTab === 'history' && (
                                     <>
                                         {transactions.length > 0 ? (

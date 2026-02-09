@@ -59,7 +59,7 @@ function ServiceRequest() {
                 customer_id: user.id
             };
 
-            await axios.post('http://localhost:5000/api/services', requestData);
+            await axios.post(import.meta.env.VITE_API_URL + '/api/services', requestData);
             navigate('/customer/dashboard');
         } catch (err) {
             setError(err.message);

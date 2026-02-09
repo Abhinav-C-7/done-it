@@ -12,7 +12,7 @@ function WorkerDashboard() {
 
     useEffect(() => {
         // Initialize socket connection
-        const newSocket = io("http://localhost:5000");
+        const newSocket = io(import.meta.env.VITE_API_URL);
         setSocket(newSocket);
 
         // Fetch initial jobs
@@ -23,7 +23,7 @@ function WorkerDashboard() {
 
     const fetchJobs = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/jobs");
+            const response = await axios.get(import.meta.env.VITE_API_URL + "/api/jobs");
             setJobs(response.data);
         } catch (error) {
             console.error("Error fetching jobs:", error);
@@ -32,7 +32,7 @@ function WorkerDashboard() {
 
     const acceptJob = async (jobId) => {
         try {
-            await axios.post(`http://localhost:5000/api/jobs/${jobId}/accept`, {
+            await axios.post(import.meta.env.VITE_API_URL + `/api/jobs/${jobId}/accept`, {
                 workerId: user.id
             });
             fetchJobs();
@@ -43,7 +43,7 @@ function WorkerDashboard() {
 
     const completeJob = async (jobId) => {
         try {
-            await axios.post(`http://localhost:5000/api/jobs/${jobId}/complete`);
+            await axios.post(import.meta.env.VITE_API_URL + `/api/jobs/${jobId}/complete`);
             fetchJobs();
         } catch (error) {
             console.error("Error completing job:", error);
@@ -81,11 +81,10 @@ function WorkerDashboard() {
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`${
-                                    activeTab === tab
+                                className={`${activeTab === tab
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize`}
+                                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize`}
                             >
                                 {tab} Jobs
                             </button>

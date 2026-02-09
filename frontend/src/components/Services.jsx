@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { serviceApi } from '../services/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZSBBdmFpbGFibGU8L3RleHQ+PC9zdmc+';
 
 // Define service title mappings and their routes
@@ -151,21 +151,21 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
                 if (SERVICE_ROUTES[title]) {
                     return SERVICE_ROUTES[title].category === categoryFilter;
                 }
-                
+
                 // If not found directly, try to find a similar title
-                const matchingTitle = Object.keys(SERVICE_ROUTES).find(key => 
-                    title.toLowerCase().includes(key.toLowerCase()) || 
+                const matchingTitle = Object.keys(SERVICE_ROUTES).find(key =>
+                    title.toLowerCase().includes(key.toLowerCase()) ||
                     key.toLowerCase().includes(title.toLowerCase())
                 );
-                
+
                 if (matchingTitle) {
                     return SERVICE_ROUTES[matchingTitle].category === categoryFilter;
                 }
-                
+
                 // If no match found, include in results if service.category matches
                 return service.category === categoryFilter;
             });
-            
+
             setFilteredServices(filtered);
         }
     }, [services, categoryFilter]);
@@ -174,26 +174,26 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
         const title = service.title?.trim();
         console.log('Service clicked:', service);
         console.log('Service title:', title);
-        
+
         if (SERVICE_ROUTES[title]) {
             console.log('Found direct route match:', SERVICE_ROUTES[title].route);
             navigate(SERVICE_ROUTES[title].route);
             return;
-        } 
-        
+        }
+
         // If not found directly, try to find a similar title
-        const matchingTitle = Object.keys(SERVICE_ROUTES).find(key => 
-            title.toLowerCase().includes(key.toLowerCase()) || 
+        const matchingTitle = Object.keys(SERVICE_ROUTES).find(key =>
+            title.toLowerCase().includes(key.toLowerCase()) ||
             key.toLowerCase().includes(title.toLowerCase())
         );
-        
+
         if (matchingTitle) {
             console.log('Found matching title:', matchingTitle);
             console.log('Navigating to:', SERVICE_ROUTES[matchingTitle].route);
             navigate(SERVICE_ROUTES[matchingTitle].route);
             return;
         }
-        
+
         // If all else fails, try to determine the route from the service type or category
         if (service.category) {
             const categoryLower = service.category.toLowerCase();
@@ -218,7 +218,7 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
                 return;
             }
         }
-        
+
         console.log('No matching route found for service:', service);
     };
 
@@ -246,9 +246,9 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
                 </svg>
                 <h3 className="mt-2 text-lg font-medium text-gray-900">No services found</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                    {categoryFilter && categoryFilter !== 'All' 
+                    {categoryFilter && categoryFilter !== 'All'
                         ? `No services available in the "${categoryFilter}" category.`
-                        : searchQuery 
+                        : searchQuery
                             ? `No services match your search for "${searchQuery}".`
                             : 'No services available at the moment.'}
                 </p>
@@ -265,9 +265,9 @@ function Services({ searchQuery = '', categoryFilter = '' }) {
                     style={{ maxHeight: '500px' }}
                     onClick={() => handleServiceClick(service)}
                 >
-                    <div 
-                        className="relative overflow-hidden" 
-                        style={{ 
+                    <div
+                        className="relative overflow-hidden"
+                        style={{
                             height: '200px',
                             minHeight: '200px',
                             maxHeight: '200px'

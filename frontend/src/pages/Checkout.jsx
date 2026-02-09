@@ -30,7 +30,7 @@ const extractAddressComponents = (osmAddress) => {
 
     // First try to get the city from known fields
     let city = '';
-    
+
     // Check if we're in Kerala and use district as city if appropriate
     if (addressParts.state === 'Kerala') {
         // First check if the district is directly available
@@ -60,9 +60,9 @@ const extractAddressComponents = (osmAddress) => {
     }
 
     // Try different possible fields for postal code
-    let pincode = addressParts.postcode || 
-                  addressParts.postal_code ||
-                  '';
+    let pincode = addressParts.postcode ||
+        addressParts.postal_code ||
+        '';
 
     // Clean up the pincode to ensure it's 6 digits
     pincode = pincode ? pincode.replace(/\D/g, '') : '';
@@ -73,16 +73,16 @@ const extractAddressComponents = (osmAddress) => {
     // If we still don't have a city, try to extract it from the display name
     if (!city && osmAddress.display_name) {
         const parts = osmAddress.display_name.split(',').map(part => part.trim());
-        
+
         // Look for parts that might be city names
         for (const part of parts) {
             // Skip if part is too short, contains numbers, or is a known non-city term
-            if (part.length <= 3 || 
-                part.match(/\d/) || 
+            if (part.length <= 3 ||
+                part.match(/\d/) ||
                 part.match(/road|street|lane|state|india|kerala|district|village|town|taluk|post|office/i)) {
                 continue;
             }
-            
+
             city = part;
             break;
         }
@@ -109,7 +109,7 @@ const Checkout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user } = useAuth();
-    
+
     // Get cart state with default values
     const cartState = location.state || {};
     const cartItems = cartState.cartItems || [];
@@ -165,34 +165,34 @@ const Checkout = () => {
         try {
             // Create a service request for each item in the cart
             console.log('User data:', user);
-            
+
             // Check if user exists and has the necessary ID
             if (!user) {
                 throw new Error('User not authenticated. Please log in again.');
             }
-            
+
             // Determine the correct customer ID based on the user object structure
             // For customers, the ID is directly in user.id
             const customerId = user.id;
-            
+
             if (!customerId) {
                 throw new Error('Customer ID not found. Please log in again.');
             }
-            
+
             console.log('Using customer ID:', customerId);
-            
+
             const orderPromises = cartItems.map(async (item) => {
                 // Parse and clean amount, add booking fee divided by number of items
                 const bookingFeePerItem = bookingFee / cartItems.length;
                 const serviceFeePerItem = serviceFee / cartItems.length;
                 const itemPrice = parseFloat(item.price);
                 const cleanAmount = itemPrice + bookingFeePerItem + serviceFeePerItem;
-                
+
                 // Ensure all required fields are properly formatted
                 if (!formData.address || !formData.city || !formData.pincode || !formData.date || !formData.timeSlot) {
                     throw new Error('Please fill in all required fields');
                 }
-                
+
                 const requestData = {
                     customer_id: customerId, // Use the determined customer ID
                     service_type: item.type,
@@ -211,7 +211,7 @@ const Checkout = () => {
                 };
 
                 console.log('Creating service request with data:', requestData);
-                const response = await fetch('http://localhost:3000/api/services/request', {
+                const response = await fetch(import.meta.env.VITE_API_URL + '/api/services/request', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -239,7 +239,7 @@ const Checkout = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Comprehensive validation of all required fields
         if (!formData.address || !formData.city || !formData.pincode || !formData.timeSlot || !formData.date) {
             alert('Please fill in all required fields');
@@ -268,7 +268,7 @@ const Checkout = () => {
             console.log('Sending payment request with amount:', totalAmount);
 
             // Create Razorpay order
-            const response = await fetch('http://localhost:3000/api/services/create-payment', {
+            const response = await fetch(import.meta.env.VITE_API_URL + '/api/services/create-payment', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -299,15 +299,15 @@ const Checkout = () => {
             };
 
             // Navigate to payment page with payment details
-            navigate('/payment', { 
-                state: { 
+            navigate('/payment', {
+                state: {
                     paymentDetails: {
                         orderId: order.id,
                         bookingFee: bookingFee,
                         orderDetails: orderDetails,
                         formData: formData
-                    } 
-                } 
+                    }
+                }
             });
         } catch (error) {
             console.error('Error placing order:', error);
@@ -325,11 +325,11 @@ const Checkout = () => {
             );
             const data = await response.json();
             console.log('OSM Response:', data);
-            
+
             // Verify the location is in Kerala
             if (data.address && data.address.state === 'Kerala') {
                 const { city, pincode, fullAddress } = extractAddressComponents(data);
-                
+
                 setAddress(fullAddress);
                 setFormData(prev => ({
                     ...prev,
@@ -359,12 +359,12 @@ const Checkout = () => {
 
         try {
             // Add Kerala to the search query if not already present
-            const searchQuery = query.toLowerCase().includes('kerala') 
-                ? query 
+            const searchQuery = query.toLowerCase().includes('kerala')
+                ? query
                 : `${query}, Kerala, India`;
 
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?` + 
+                `https://nominatim.openstreetmap.org/search?` +
                 `format=json` +
                 `&q=${encodeURIComponent(searchQuery)}` +
                 `&countrycodes=in` +
@@ -378,7 +378,7 @@ const Checkout = () => {
             const keralaResults = data.filter(result => {
                 const address = result.address || {};
                 return address.state === 'Kerala' ||
-                       (result.display_name && 
+                    (result.display_name &&
                         result.display_name.toLowerCase().includes('kerala'));
             });
 
@@ -394,7 +394,7 @@ const Checkout = () => {
         const { city, pincode, fullAddress } = extractAddressComponents(suggestion);
         const lat = parseFloat(suggestion.lat);
         const lng = parseFloat(suggestion.lon);
-        
+
         setSelectedLocation({
             lat: lat,
             lng: lng,
@@ -403,7 +403,7 @@ const Checkout = () => {
         setSuggestions([]);
         setSearchQuery(fullAddress);
         setShowMap(true);
-        
+
         setFormData(prev => ({
             ...prev,
             address: fullAddress,
@@ -420,7 +420,7 @@ const Checkout = () => {
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     const { latitude, longitude } = position.coords;
-                    
+
                     try {
                         // First check if the location is in Kerala
                         const response = await fetch(
@@ -431,7 +431,7 @@ const Checkout = () => {
                             `&addressdetails=1`
                         );
                         const data = await response.json();
-                        
+
                         if (data.address && data.address.state === 'Kerala') {
                             setSelectedLocation({
                                 lat: latitude,
@@ -441,7 +441,7 @@ const Checkout = () => {
                             setSearchQuery(data.display_name);
                             setShowMap(true);
                             setSuggestions([]);
-                            
+
                             const { city, pincode, fullAddress } = extractAddressComponents(data);
                             setFormData(prev => ({
                                 ...prev,
@@ -463,7 +463,7 @@ const Checkout = () => {
                 (error) => {
                     console.error('Error getting location:', error);
                     setIsLoadingLocation(false);
-                    switch(error.code) {
+                    switch (error.code) {
                         case error.PERMISSION_DENIED:
                             alert('Please allow location access to use this feature.');
                             break;
@@ -509,7 +509,7 @@ const Checkout = () => {
         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
         script.async = true;
         document.body.appendChild(script);
-        
+
         return () => {
             document.body.removeChild(script);
         };
@@ -519,23 +519,23 @@ const Checkout = () => {
         if (showMap && selectedLocation && !map) {
             setTimeout(() => {
                 const mapInstance = L.map('map').setView([selectedLocation.lat, selectedLocation.lng], 16);
-                
+
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: ' OpenStreetMap contributors',
                     maxZoom: 19
                 }).addTo(mapInstance);
 
-                const markerInstance = L.marker([selectedLocation.lat, selectedLocation.lng], { 
+                const markerInstance = L.marker([selectedLocation.lat, selectedLocation.lng], {
                     draggable: true,
                     icon: new L.Icon.Default()
                 }).addTo(mapInstance);
-                
-                markerInstance.on('dragend', async function(e) {
+
+                markerInstance.on('dragend', async function (e) {
                     const position = e.target.getLatLng();
                     await updateAddressDetails(position.lat, position.lng);
                 });
 
-                mapInstance.on('click', async function(e) {
+                mapInstance.on('click', async function (e) {
                     const { lat, lng } = e.latlng;
                     markerInstance.setLatLng([lat, lng]);
                     await updateAddressDetails(lat, lng);
@@ -605,7 +605,7 @@ const Checkout = () => {
                     <h1 className="text-3xl font-bold text-gray-800">Checkout</h1>
                     <div className="h-1 w-20 bg-yellow-400 rounded-full"></div>
                 </div>
-                
+
                 <div className="flex flex-col md:flex-row gap-8">
                     {/* Left Section - Form */}
                     <div className="flex-1">
@@ -846,7 +846,7 @@ const Checkout = () => {
                                             </span>
                                         </div>
                                         {item.time && <p className="text-sm text-gray-500 mb-2">{item.time}</p>}
-                                        
+
                                         {item.variablePrice && (
                                             <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                                 <p className="text-gray-800 font-medium mb-2 text-sm">Price Breakdown:</p>
@@ -883,7 +883,7 @@ const Checkout = () => {
                         <div className="p-4 border-b">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-semibold">Select Location</h3>
-                                <button 
+                                <button
                                     onClick={handleModalClose}
                                     className="text-gray-500 hover:text-gray-700"
                                 >

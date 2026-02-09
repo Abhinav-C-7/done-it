@@ -1,7 +1,7 @@
 // Firebase authentication functions
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   sendEmailVerification,
   sendSignInLinkToEmail,
@@ -15,7 +15,7 @@ import { auth } from './config';
 import axios from 'axios';
 
 // API URL from environment variables (Vite format)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Check if email exists in customers database
 export const checkEmailInDatabase = async (email) => {
@@ -39,7 +39,7 @@ export const createUserWithEmail = async (email, password) => {
     const methods = await fetchSignInMethodsForEmail(auth, email);
     const emailExistsInFirebase = methods.length > 0;
     console.log('Email exists in Firebase:', emailExistsInFirebase);
-    
+
     let emailExistsInDatabase = false;
     try {
       // Then check if email exists in our database
@@ -49,14 +49,14 @@ export const createUserWithEmail = async (email, password) => {
       console.error('Error checking email in database, proceeding with registration:', error);
       // If we can't check the database, proceed with registration
     }
-    
+
     // If email exists in both Firebase and database, we can't register
     if (emailExistsInFirebase && emailExistsInDatabase) {
       throw new Error('This email is already registered. Please use a different email or login.');
     }
-    
+
     let user;
-    
+
     if (!emailExistsInFirebase) {
       try {
         // Email doesn't exist in Firebase, so create a new user
@@ -64,11 +64,11 @@ export const createUserWithEmail = async (email, password) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         user = userCredential.user;
         console.log('User created successfully:', user.uid);
-        
+
         // Send verification email
         console.log('Sending verification email to new user');
         await sendVerificationEmail(user);
-        
+
         return user;
       } catch (error) {
         console.error('Error creating user in Firebase:', error);
@@ -77,7 +77,7 @@ export const createUserWithEmail = async (email, password) => {
     } else {
       // Email exists in Firebase but not in database
       console.log('Email exists in Firebase but not in database:', email);
-      
+
       // Return a placeholder user object
       return {
         email,
@@ -87,7 +87,7 @@ export const createUserWithEmail = async (email, password) => {
     }
   } catch (error) {
     console.error('Error in createUserWithEmail:', error);
-    
+
     // If email already exists in Firebase but not in database, we should allow this
     if (error.code === 'auth/email-already-in-use') {
       let emailExistsInDatabase = false;
@@ -97,11 +97,11 @@ export const createUserWithEmail = async (email, password) => {
         console.error('Error checking email in database:', dbError);
         // If we can't check the database, assume it doesn't exist there
       }
-      
+
       if (!emailExistsInDatabase) {
         // Email exists in Firebase but not in database - this is fine
         console.log('Email exists in Firebase but not in database (from error handler)');
-        
+
         // Return a placeholder user object instead of throwing an error
         return {
           email,
@@ -113,7 +113,7 @@ export const createUserWithEmail = async (email, password) => {
         throw new Error('This email is already registered. Please use a different email or login.');
       }
     }
-    
+
     throw error;
   }
 };
@@ -128,16 +128,16 @@ export const sendVerificationEmail = async (user) => {
       // This must be true for email link sign-in
       handleCodeInApp: true,
     };
-    
+
     console.log('Sending verification email with redirect URL:', actionCodeSettings.url);
-    
+
     // Store the email in localStorage for verification
     localStorage.setItem('emailForSignIn', user.email);
-    
+
     // Send email verification link
     await sendEmailVerification(user, actionCodeSettings);
     console.log('Verification email sent successfully');
-    
+
     return true;
   } catch (error) {
     console.error('Error sending verification email:', error);
@@ -159,10 +159,10 @@ export const completeSignInWithEmailLink = async (email, url) => {
   try {
     console.log('Completing sign-in with email link:', email, url);
     const result = await signInWithEmailLink(auth, email, url);
-    
+
     // Clear email from storage
     localStorage.removeItem('emailForSignIn');
-    
+
     return result.user;
   } catch (error) {
     console.error('Error completing sign-in with email link:', error);
